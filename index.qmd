@@ -15,9 +15,9 @@ Advanced spatial analysis and data science for urban planning and public policy.
 - **Final Project:** Capstone modeling challenge
 
 ## About Me
-Angie Kwon (MCP/MPH '28)
+**Angie Kwon (MCP/MPH '28)** \
 I am taking this course to create a strong foundation for public policy oriented quantitative data analysis, which is I lack experience in. I hope to work in public policy in the future, and this would strengthen my diverse skillset.
 
 ## Contact
-- Email: [akwon1@upenn.edu]
-- GitHub: [@akwon1]
+- Email: akwon1@upenn.edu
+- GitHub: @akwon1
