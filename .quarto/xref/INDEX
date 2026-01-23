@@ -1,5 +1,8 @@
 {
   "index.qmd": {
     "index.html": "26a3b28e"
+  },
+  "labs/lab_0/lab0_template.qmd": {
+    "lab0_template.html": "62a54dc4"
   }
 }
