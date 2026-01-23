@@ -1,4 +1,4 @@
-git---
+---
 title: "MUSA 5080 Portfolio"
 ---
 
@@ -16,7 +16,7 @@ Advanced spatial analysis and data science for urban planning and public policy.
 
 ## About Me
 **Angie Kwon (MCP/MPH '28)** \
-I am taking this course to create a strong foundation for public policy oriented quantitative data analysis, which is I lack experience in. I hope to work in public policy in the future, and this would strengthen my diverse skillset.
+I graduated from Swarthmore College in 2024 with a B.A. double majoring in Psychology and Art. Currently, I am in the process of obtaining a dual degree in City Planning and Public Health at the University of Pennsylvania. I am taking this course to create a strong foundation for public policy oriented quantitative data analysis, which is I lack experience in. I hope to work in public policy in the future, and this would strengthen my diverse skillset.
 
 ## Contact
 - Email: akwon1@upenn.edu
