@@ -222,8 +222,7 @@ car_count_manufacturer
 ```{r categorical-summaries}
 # Frequency table for price categories
 price_category_frequency <- car_data %>%
-  group_by(price_category) %>%
-  tally()
+  count(price_category)
 
 price_category_frequency
 ```
