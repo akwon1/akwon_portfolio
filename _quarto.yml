@@ -12,7 +12,7 @@ website:
         menu:
           - href: labs/lab_0/lab0_template.html
             text: "Lab 0: dplyr Basics"
-          - href: labs/lab_1/your_file_name.qmd
+          - href: labs/lab_1/lab1.qmd
             text: "Lab 1: Census Data Exploration"
 
 format:
