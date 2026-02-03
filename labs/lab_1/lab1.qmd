@@ -95,7 +95,7 @@ MI_2022 <- MI_2022 %>%
   mutate(NAME = str_remove(NAME, " County, Michigan"))
 
 # Display the first few rows
-print(MI_2022)
+glimpse(MI_2022)
 ```
 
 ## 2.2 Data Quality Assessment
@@ -114,9 +114,20 @@ print(MI_2022)
 
 ```{r income-reliability}
 # Calculate MOE percentage and reliability categories using mutate()
+#without mutate()
+#MI_2022$MOE_per <- (MI_2022$med_HH_incM/MI_2022$med_HH_incE)*100
+
+MI_2022 <- MI_2022 %>%
+  mutate(MOE_per = (med_HH_incM/med_HH_incE)*100)
 
 # Create a summary showing count of counties in each reliability category
 # Hint: use count() and mutate() to add percentages
+MI_2022 <- MI_2022 %>% 
+  mutate(reli_cat = case_when(MOE_per < 5 ~ 'High Confidence',
+                                   MOE_per > 10 ~ 'Low Confidence',
+                                   TRUE ~ 'Moderate Confidence'))
+reli_cat_freq <- MI_2022 %>%
+  count(reli_cat)
 ```
 
 ## 2.3 High Uncertainty Counties
@@ -133,8 +144,10 @@ print(MI_2022)
 
 ```{r high-uncertainty}
 # Create table of top 5 counties by MOE percentage
+arrange(MI_2022, desc(MOE_per))
 
 # Format as table with kable() - include appropriate column names and caption
+
 ```
 
 **Data Quality Commentary:**
