@@ -144,10 +144,12 @@ reli_cat_freq <- MI_2022 %>%
 
 ```{r high-uncertainty}
 # Create table of top 5 counties by MOE percentage
-arrange(MI_2022, desc(MOE_per))
+#arrange(MI_2022, desc(MOE_per))
+#MOE_min <- MI_2022 %>% slice_min(MOE_per, n=5)
+MOE_max <- MI_2022 %>% slice_max(MOE_per, n=5)
 
 # Format as table with kable() - include appropriate column names and caption
-
+kable(MOE_max[, -c(1,5,6,9)], "simple", col.names = c("Name", "Median Income", "Median Income Margin of Error", "Margin of Error Percentage", "Reliability", "geometry"))
 ```
 
 **Data Quality Commentary:**
