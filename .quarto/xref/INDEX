@@ -4,5 +4,11 @@
   },
   "labs/lab_0/lab0_template.qmd": {
     "lab0_template.html": "62a54dc4"
+  },
+  "labs/lab_1/lab1.qmd": {
+    "lab1.html": "82cc07e9"
+  },
+  "inclass_exercise/week3_lab_exercise.qmd": {
+    "week3_lab_exercise.html": "647c364b"
   }
 }
