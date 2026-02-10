@@ -87,7 +87,7 @@ my_state <- "Michigan"
 # Write your get_acs() code here
 acsVariables <- c(med_HH_inc = "B19013_001", totpop = "B01003_001")
 MI_2022 <- get_acs(geography="county", variables = acsVariables,
-                        state = "MI", survey = "acs5", year = 2022, output = "wide", geometry = T)
+                        state = "MI", survey = "acs5", year = 2022, output = "wide")
 
 # Clean the county names to remove state name and "County" 
 # Hint: use mutate() with str_remove()
@@ -149,11 +149,11 @@ reli_cat_freq <- MI_2022 %>%
 MOE_max <- MI_2022 %>% slice_max(MOE_per, n=5)
 
 # Format as table with kable() - include appropriate column names and caption
-kable(MOE_max[, c(2,3,4,7,8)], "simple", col.names = c("Name", "Median Income", "Median Income Margin of Error", "Margin of Error Percentage", "Reliability", "Geometry"), caption = "Top 5 counties with the highest median income margins of error")
+kable(MOE_max[, c(2,3,4,7,8)], "simple", col.names = c("Name", "Median Income", "Median Income Margin of Error", "Margin of Error Percentage", "Reliability"), caption = "Top 5 counties with the highest median income margins of error")
 
 #consequence bearing hardest on smallest counties?
 pop_min <- MI_2022 %>% slice_min(totpopE, n=5)
-kable(pop_min[, c(2,5,3,4,7,8)], "simple", col.names = c("Name", "Total Population", "Median Income", "Median Income Margin of Error", "Margin of Error Percentage", "Reliability", "Geometry"), caption = "Top 5 counties with the lowest population")
+kable(pop_min[, c(2,5,3,4,7,8)], "simple", col.names = c("Name", "Total Population", "Median Income", "Median Income Margin of Error", "Margin of Error Percentage", "Reliability"), caption = "Top 5 counties with the lowest population")
 ```
 
 **Data Quality Commentary:**
@@ -171,9 +171,11 @@ kable(pop_min[, c(2,5,3,4,7,8)], "simple", col.names = c("Name", "Total Populati
 ```{r select-counties}
 # Use filter() to select 2-3 counties from your county_reliability data
 # Store the selected counties in a variable called selected_counties
+filtered_MI <- filter(MI_2022, NAME == "Oakland" | NAME == "Mackinac" | NAME == "Keweenaw")
 
 # Display the selected counties with their key characteristics
 # Show: county name, median income, MOE percentage, reliability category
+kable(filtered_MI[, c(2,3,7,8)], "simple", col.names = c("Name", "Median Income", "Margin of Error Percentage", "Reliability"), caption = "3 counties representing different data reliability levels")
 ```
 
 **Comment on the output:** [write something :)]
@@ -191,14 +193,27 @@ kable(pop_min[, c(2,5,3,4,7,8)], "simple", col.names = c("Name", "Total Populati
 
 ```{r tract-demographics}
 # Define your race/ethnicity variables with descriptive names
+race_eth_vars <- c(White = "B03002_003", Black = "B03002_004", Hisp_Lat = "B03002_012",
+                   Total_Pop = "B03002_001")
 
 # Use get_acs() to retrieve tract-level data
 # Hint: You may need to specify county codes in the county parameter
+race_eth_2022 <- get_acs(geography="tract", variables = race_eth_vars,
+                        state = "MI", county = c(083, 097, 125), 
+                        survey = "acs5", year = 2022, output = "wide")
 
 # Calculate percentage of each group using mutate()
 # Create percentages for white, Black, and Hispanic populations
+race_eth_2022 <- race_eth_2022 %>%
+  mutate(perW = (WhiteE/Total_PopE)*100,
+         perB = (BlackE/Total_PopE)*100,
+         perH = (Hisp_LatE/Total_PopE)*100)
 
 # Add readable tract and county name columns using str_extract() or similar
+race_eth_2022 <- race_eth_2022 %>%
+  mutate(tract = str_extract(NAME, "[0-9.]+"),
+         NAME = str_extract(NAME, "Oakland|Mackinac|Keweenaw"))
+
 ```
 
 ## 3.3 Demographic Analysis
@@ -208,11 +223,19 @@ kable(pop_min[, c(2,5,3,4,7,8)], "simple", col.names = c("Name", "Total Populati
 ```{r demographic-analysis}
 # Find the tract with the highest percentage of Hispanic/Latino residents
 # Hint: use arrange() and slice() to get the top tract
+hisp_max <- race_eth_2022 %>% slice_max(Hisp_LatE/Total_PopE, n=1)
 
 # Calculate average demographics by county using group_by() and summarize()
 # Show: number of tracts, average percentage for each racial/ethnic group
+avg_demo <- race_eth_2022 %>%
+  group_by(NAME) %>%
+  summarize(avg_W_per = mean(perW, na.rm = TRUE), 
+            avg_B_per = mean(perB, na.rm = TRUE),
+            avg_H_per = mean(perH, na.rm = TRUE),
+            count = n())
 
 # Create a nicely formatted table of your results using kable()
+kable(avg_demo[, c(1,5,2,3,4)], "simple", col.names = c("County", "Number of Tracts", "Average Percentage of White Residents", "Average Percentage of Black Residents", "Average Percentage of Hispanic Residents"), caption = "Average demographics of each county")
 ```
 
 # Part 4: Comprehensive Data Quality Evaluation
@@ -229,11 +252,38 @@ kable(pop_min[, c(2,5,3,4,7,8)], "simple", col.names = c("Name", "Total Populati
 ```{r demographic-moe}
 # Calculate MOE percentages for white, Black, and Hispanic variables
 # Hint: use the same formula as before (margin/estimate * 100)
+race_eth_2022 <- race_eth_2022 %>%
+  mutate(MOE_perW = (WhiteM/WhiteE)*100,
+         MOE_perB = (BlackM/BlackE)*100,
+         MOE_perH = (Hisp_LatM/Hisp_LatE)*100)
+# get rid of all infinites
+race_eth_2022[sapply(race_eth_2022, is.infinite)] <- NA
 
 # Create a flag for tracts with high MOE on any demographic variable
 # Use logical operators (| for OR) in an ifelse() statement
 
+#misunderstood this as any variable, as in any of the 3 is high MOE
+race_eth_2022 <- race_eth_2022 %>%
+  mutate(MOE_cat = ifelse(MOE_perW > 15 | MOE_perB > 15 | MOE_perH > 15, 
+                          "High MOE", "Low MOE"))
+race_eth_2022$MOE_cat[is.na(race_eth_2022$MOE_cat)] <- "No Certainty"
+
+#so second version where it's just black residents having high MOE
+race_eth_2022 <- race_eth_2022 %>%
+  mutate(MOE_catB = ifelse(MOE_perB > 15,
+                          "High Black MOE", "Low Black MOE"))
+race_eth_2022$MOE_catB[is.na(race_eth_2022$MOE_catB)] <- "No Certainty"
+
 # Create summary statistics showing how many tracts have data quality issues
+data_qual_n <- race_eth_2022 %>%
+  group_by(MOE_cat) %>%
+  count(MOE_cat)
+data_qual_n
+
+data_qual_n_B <- race_eth_2022 %>%
+  group_by(MOE_catB) %>%
+  count(MOE_catB)
+data_qual_n_B
 ```
 
 ## 4.2 Pattern Analysis
@@ -244,9 +294,86 @@ kable(pop_min[, c(2,5,3,4,7,8)], "simple", col.names = c("Name", "Total Populati
 # Group tracts by whether they have high MOE issues
 # Calculate average characteristics for each group:
 # - population size, demographic percentages
+data_qual_examine <- race_eth_2022 %>%
+  group_by(MOE_cat) %>%
+  summarize(avg_pop = mean(Total_PopE, na.rm = TRUE), 
+            avg_W_per = mean(perW, na.rm = TRUE),
+            avg_B_per = mean(perB, na.rm = TRUE),
+            avg_H_per = mean(perH, na.rm = TRUE),
+            count = n())
+
+data_qual_W <- race_eth_2022 %>%
+  group_by(MOE_perW > 15) %>%
+  summarize(avg_pop = mean(Total_PopE, na.rm = TRUE), 
+            avg_W_per = mean(perW, na.rm = TRUE),
+            avg_B_per = mean(perB, na.rm = TRUE),
+            avg_H_per = mean(perH, na.rm = TRUE),
+            count = n())
+data_qual_B <- race_eth_2022 %>%
+  group_by(MOE_perB > 15) %>%
+  summarize(avg_pop = mean(Total_PopE, na.rm = TRUE), 
+            avg_W_per = mean(perW, na.rm = TRUE),
+            avg_B_per = mean(perB, na.rm = TRUE),
+            avg_H_per = mean(perH, na.rm = TRUE),
+            count = n())
+data_qual_H <- race_eth_2022 %>%
+  group_by(MOE_perH > 15) %>%
+  summarize(avg_pop = mean(Total_PopE, na.rm = TRUE), 
+            avg_W_per = mean(perW, na.rm = TRUE),
+            avg_B_per = mean(perB, na.rm = TRUE),
+            avg_H_per = mean(perH, na.rm = TRUE),
+            count = n())
+
+race_eth_2022 <- race_eth_2022 %>% 
+  mutate(indv_MOE_cat = case_when(MOE_perW > 15 & MOE_perB > 15 & MOE_perH > 15 ~ 'All High MOE',
+                                  MOE_perW < 15 & MOE_perB < 15 & MOE_perH < 15 ~ 'All Low MOE',
+                                  MOE_perW > 15 & MOE_perB > 15 | MOE_perH > 15 ~ 'Two High MOE',
+                                  MOE_perW > 15 | MOE_perB > 15 & MOE_perH > 15 ~ 'Two High MOE',
+                                  MOE_perW > 15 & MOE_perH > 15 | MOE_perB > 15 ~ 'Two High MOE',
+                                  is.na(MOE_perW) | is.na(MOE_perH) | is.na(MOE_perB) ~ 'At least one NA',
+                                   TRUE ~ 'One High MOE'))
+detail_MOE_cat <- race_eth_2022 %>%
+  group_by(indv_MOE_cat) %>%
+  summarize(avg_pop = mean(Total_PopE, na.rm = TRUE), 
+            avg_W_per = mean(perW, na.rm = TRUE),
+            avg_B_per = mean(perB, na.rm = TRUE),
+            avg_H_per = mean(perH, na.rm = TRUE),
+            count = n())
+
+
+#just white residents having high MOE
+race_eth_2022 <- race_eth_2022 %>%
+  mutate(MOE_catW = ifelse(MOE_perW > 15,
+                          "High White MOE", "Low White MOE"))
+race_eth_2022$MOE_catW[is.na(race_eth_2022$MOE_catW)] <- "No Certainty"
+
+data_qual_n_W <- race_eth_2022 %>%
+  group_by(MOE_catW) %>%
+  count(MOE_catW)
+data_qual_n_W
+
+#just hispanic residents having high MOE
+race_eth_2022 <- race_eth_2022 %>%
+  mutate(MOE_catH = ifelse(MOE_perH > 15,
+                          "High Hispanic MOE", "Low Hispanic MOE"))
+race_eth_2022$MOE_catH[is.na(race_eth_2022$MOE_catH)] <- "No Certainty"
+
+data_qual_n_H <- race_eth_2022 %>%
+  group_by(MOE_catH) %>%
+  count(MOE_catH)
+data_qual_n_H
 
 # Use group_by() and summarize() to create this comparison
 # Create a professional table showing the patterns
+race <- c("White", "Black", "Hispanic")
+high_MOE_n <- c(187, 322, 342)
+low_MOE_n <- c(165, 6, 2)
+no_certain_n <- c(7, 31, 15)
+race_n_high_MOE <- data.frame(race, high_MOE_n, low_MOE_n, no_certain_n)
+
+race_n_high_MOE <- race_n_high_MOE %>%
+  mutate(per_High = high_MOE_n/(high_MOE_n+low_MOE_n)*100)
+race_n_high_MOE
 ```
 
 **Pattern Analysis:** [Describe any patterns you observe. Do certain types of communities have less reliable data? What might explain this?]
