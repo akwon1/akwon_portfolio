@@ -128,6 +128,7 @@ MI_2022 <- MI_2022 %>%
                                    TRUE ~ 'Moderate Confidence'))
 reli_cat_freq <- MI_2022 %>%
   count(reli_cat)
+reli_cat_freq
 ```
 
 ## 2.3 High Uncertainty Counties
@@ -147,6 +148,7 @@ reli_cat_freq <- MI_2022 %>%
 #arrange(MI_2022, desc(MOE_per))
 #MOE_min <- MI_2022 %>% slice_min(MOE_per, n=5)
 MOE_max <- MI_2022 %>% slice_max(MOE_per, n=5)
+MOE_max
 
 # Format as table with kable() - include appropriate column names and caption
 kable(MOE_max[, c(2,3,4,7,8)], "simple", col.names = c("Name", "Median Income", "Median Income Margin of Error", "Margin of Error Percentage", "Reliability"), caption = "Top 5 counties with the highest median income margins of error")
@@ -158,7 +160,7 @@ kable(pop_min[, c(2,5,3,4,7,8)], "simple", col.names = c("Name", "Total Populati
 
 **Data Quality Commentary:**
 
-[Write 2-3 sentences explaining what these results mean for algorithmic decision-making. Consider: Which counties might be poorly served by algorithms that rely on this income data? What factors might contribute to higher uncertainty?]
+These results show that even with a government-wide survey, there are very high margins of error, which have policy implications, where these counties may be over- or underestimated in various variables. In this instance, the counties with higher margins of error may be overestimated as more affluent than they actually are, which may lead to them not receiving the aid or funding they need, or they might be underestimated as less wealthy than they actually are, which may lead to resources being needlessly diverted to them, when in fact others need them more. The second table shows that the population size may have at least some effect, since the two counties with "Low Confidence" are both in the top 5 smallest counties in Michigan.
 
 # Part 3: Neighborhood-Level Analysis
 
@@ -178,7 +180,7 @@ filtered_MI <- filter(MI_2022, NAME == "Oakland" | NAME == "Mackinac" | NAME == 
 kable(filtered_MI[, c(2,3,7,8)], "simple", col.names = c("Name", "Median Income", "Margin of Error Percentage", "Reliability"), caption = "3 counties representing different data reliability levels")
 ```
 
-**Comment on the output:** [write something :)]
+**Comment on the output:** The wide range of the margins of error is quite intersting, as they all come from one state, and presumably they try to draw county lines to be as representative as possible. Of course it can't always be helped, but it's interesting to see regardless. Also, Oakland county is where I grew up!
 
 ## 3.2 Tract-Level Demographics
 
@@ -214,6 +216,7 @@ race_eth_2022 <- race_eth_2022 %>%
   mutate(tract = str_extract(NAME, "[0-9.]+"),
          NAME = str_extract(NAME, "Oakland|Mackinac|Keweenaw"))
 
+race_eth_2022
 ```
 
 ## 3.3 Demographic Analysis
@@ -274,6 +277,8 @@ race_eth_2022 <- race_eth_2022 %>%
                           "High Black MOE", "Low Black MOE"))
 race_eth_2022$MOE_catB[is.na(race_eth_2022$MOE_catB)] <- "No Certainty"
 
+race_eth_2022
+
 # Create summary statistics showing how many tracts have data quality issues
 data_qual_n <- race_eth_2022 %>%
   group_by(MOE_cat) %>%
@@ -301,6 +306,7 @@ data_qual_examine <- race_eth_2022 %>%
             avg_B_per = mean(perB, na.rm = TRUE),
             avg_H_per = mean(perH, na.rm = TRUE),
             count = n())
+data_qual_examine
 
 data_qual_W <- race_eth_2022 %>%
   group_by(MOE_perW > 15) %>%
@@ -309,6 +315,8 @@ data_qual_W <- race_eth_2022 %>%
             avg_B_per = mean(perB, na.rm = TRUE),
             avg_H_per = mean(perH, na.rm = TRUE),
             count = n())
+data_qual_W
+
 data_qual_B <- race_eth_2022 %>%
   group_by(MOE_perB > 15) %>%
   summarize(avg_pop = mean(Total_PopE, na.rm = TRUE), 
@@ -316,6 +324,8 @@ data_qual_B <- race_eth_2022 %>%
             avg_B_per = mean(perB, na.rm = TRUE),
             avg_H_per = mean(perH, na.rm = TRUE),
             count = n())
+data_qual_B
+
 data_qual_H <- race_eth_2022 %>%
   group_by(MOE_perH > 15) %>%
   summarize(avg_pop = mean(Total_PopE, na.rm = TRUE), 
@@ -323,6 +333,7 @@ data_qual_H <- race_eth_2022 %>%
             avg_B_per = mean(perB, na.rm = TRUE),
             avg_H_per = mean(perH, na.rm = TRUE),
             count = n())
+data_qual_H
 
 race_eth_2022 <- race_eth_2022 %>% 
   mutate(indv_MOE_cat = case_when(MOE_perW > 15 & MOE_perB > 15 & MOE_perH > 15 ~ 'All High MOE',
@@ -332,6 +343,8 @@ race_eth_2022 <- race_eth_2022 %>%
                                   MOE_perW > 15 & MOE_perH > 15 | MOE_perB > 15 ~ 'Two High MOE',
                                   is.na(MOE_perW) | is.na(MOE_perH) | is.na(MOE_perB) ~ 'At least one NA',
                                    TRUE ~ 'One High MOE'))
+race_eth_2022
+
 detail_MOE_cat <- race_eth_2022 %>%
   group_by(indv_MOE_cat) %>%
   summarize(avg_pop = mean(Total_PopE, na.rm = TRUE), 
@@ -339,6 +352,7 @@ detail_MOE_cat <- race_eth_2022 %>%
             avg_B_per = mean(perB, na.rm = TRUE),
             avg_H_per = mean(perH, na.rm = TRUE),
             count = n())
+detail_MOE_cat
 
 
 #just white residents having high MOE
@@ -346,6 +360,7 @@ race_eth_2022 <- race_eth_2022 %>%
   mutate(MOE_catW = ifelse(MOE_perW > 15,
                           "High White MOE", "Low White MOE"))
 race_eth_2022$MOE_catW[is.na(race_eth_2022$MOE_catW)] <- "No Certainty"
+race_eth_2022
 
 data_qual_n_W <- race_eth_2022 %>%
   group_by(MOE_catW) %>%
@@ -357,6 +372,7 @@ race_eth_2022 <- race_eth_2022 %>%
   mutate(MOE_catH = ifelse(MOE_perH > 15,
                           "High Hispanic MOE", "Low Hispanic MOE"))
 race_eth_2022$MOE_catH[is.na(race_eth_2022$MOE_catH)] <- "No Certainty"
+race_eth_2022
 
 data_qual_n_H <- race_eth_2022 %>%
   group_by(MOE_catH) %>%
@@ -376,8 +392,8 @@ race_n_high_MOE <- race_n_high_MOE %>%
 race_n_high_MOE
 ```
 
-**Pattern Analysis:** [Describe any patterns you observe. Do certain types of communities have less reliable data? What might explain this?]
-
+**Pattern Analysis:** 
+The most stark pattern is that, whereas all three races' population estimate overall have quite high margins of errors, this effect is significantly higher for Black and Hispanic/Latino residents. White residents have 187 tracts where the margins of error is higher than 15%, which amounts to 53.13% of all the tracts in Oakland, Mackinac, and Keweenaw counties. Black residents on the other hand have 322, which is 98.17% of all tracts, and Hispanic residents have 342, which is 99.42% of all tracts. This shows that the data for Black and Hispanic residents are much more unreliable than the data for White residents. This might either be because there are less Black and Hispanic people in these counties in general, leading to huge skews in their data depending on tracts, or because they are chronically underestimated in data collection, due to human error, bias or prejudice.
 
 # Part 5: Policy Recommendations
 
@@ -386,14 +402,21 @@ race_n_high_MOE
 **Your Task:** Write an executive summary that integrates findings from all four analyses.
 
 **Executive Summary Requirements:**
-1. **Overall Pattern Identification**: What are the systematic patterns across all your analyses?
-2. **Equity Assessment**: Which communities face the greatest risk of algorithmic bias based on your findings?
-3. **Root Cause Analysis**: What underlying factors drive both data quality issues and bias risk?
-4. **Strategic Recommendations**: What should the Department implement to address these systematic issues?
+
+**Overall Pattern Identification**: 
+**Equity Assessment**: 
+**Root Cause Analysis**: 
+**Strategic Recommendations**: 
 
 **Executive Summary:**
 
-[Your integrated 4-paragraph summary here]
+Overall, my analyses shows several systematic patterns. One, smaller counties with less people generally have less reliable data. This is largely due to the fact that with smaller sample sizes, it becomes difficult to extrapolate any findings, making any statistical relationships unsure of its significance. Another pattern is soemthing briefly talked about in the previous section. Among the three counties--Oakland, Mackninac, Keweenaw--it seems that Black and Hispanic residents' data were clearly more unreliable. This may be due to the sample size, or Black and Hispanic people don't live in those counties, or there is something more sinister going on, where they are systematically purposefully under-counted or statistically misrepresented.
+
+All of these shows that the Black and Hispanic communities are at great risk of algorithmic bias. The data technically exists, but the large margins of error make it clear that this data should be used sparingly and cautiously. Thought cautious data usage is good practice, it seems to be disadvantageous that these people of color's data should only be used after taking further necessary precautions. This added level of difficulty in accessing and analyzing the data may lead to policy makers to intentionally not use the data either due to fear of misrepresenting their constituents or due to laziness.
+
+It's likely that Black and Hispanic people don't live in these areas, either by change or systemic disadvantages, as seen in the case of redlining. This may lead to problems of reinforcing euro- white-centric social norms with the policies reflecting and amplifying that. The cause of both the bad data quality and bias risk may be due to human bias, where certain White surveyors might be unwilling to approach or collect data from non-White residents, consciously or not. If done subconsciously, this could lead to the belief that the data is impartial and representative, when that may not be the case. 
+
+There are plenty of psychology studies showing that even just acknowledging you might have bias leads to you to think through your actions more consciously and reduce personal biases. Employee workshops to increase self-awareness in such a manner might be a simple but effective technique to start address these systematic issues. Another thing to do would be to take a closer look at all the data, including other variables not just income, and across all other intersections of identities, to make sure no one get swept under the rug. Taking a closer look at the data would also reveal where there are outliers versus actual pattern. If a county seems to be an outlier in every single analyses, a closer look should be taken to try to resolve any disparities.
 
 ## 6.3 Specific Recommendations
 
@@ -402,28 +425,70 @@ race_n_high_MOE
 ```{r recommendations-data}
 # Create a summary table using your county reliability data
 # Include: county name, median income, MOE percentage, reliability category
+county_reliability <- MI_2022[,c(2,3,7,8)]
+county_reliability
 
 # Add a new column with algorithm recommendations using case_when():
 # - High Confidence: "Safe for algorithmic decisions"
 # - Moderate Confidence: "Use with caution - monitor outcomes"  
 # - Low Confidence: "Requires manual review or additional data"
+county_reliability <- county_reliability %>%
+  mutate(algo_rec = case_when(reli_cat == "High Confidence" ~ "Safe for algorithmic decisions",
+                              reli_cat == "Moderate Confidence" ~ "Use with caution - monitor outcomes",
+                              reli_cat == "Low Confidence" ~ "Requires manual review or additional data"))
 
 # Format as a professional table with kable()
+kable(county_reliability, "simple", col.names = c("County", "Median Income Estimate", "Margin of Error Percentage", "Reliability Category", "Algorithm Recommendation"), caption = "Algorithm Implementation Decision Framework")
+
+safe_data_counties <- county_reliability %>% filter(algo_rec == "Safe for algorithmic decisions")
+cautious_data_counties <- county_reliability %>% filter(algo_rec == "Use with caution - monitor outcomes")
+need_more_data_counties <- county_reliability %>% filter(algo_rec == "Requires manual review or additional data")
 ```
 
 **Key Recommendations:**
 
 **Your Task:** Use your analysis results to provide specific guidance to the department.
 
-1. **Counties suitable for immediate algorithmic implementation:** [List counties with high confidence data and explain why they're appropriate]
+1. **Counties suitable for immediate algorithmic implementation:**  
 
-2. **Counties requiring additional oversight:** [List counties with moderate confidence data and describe what kind of monitoring would be needed]
+[1] "Alcona"         "Allegan"        "Alpena"         "Antrim"         "Arenac"        
+ [6] "Barry"          "Bay"            "Berrien"        "Branch"         "Calhoun"       
+[11] "Cass"           "Charlevoix"     "Cheboygan"      "Chippewa"       "Clare"         
+[16] "Clinton"        "Dickinson"      "Eaton"          "Genesee"        "Gladwin"       
+[21] "Grand Traverse" "Gratiot"        "Hillsdale"      "Houghton"       "Huron"         
+[26] "Ingham"         "Ionia"          "Isabella"       "Jackson"        "Kalamazoo"     
+[31] "Kent"           "Lapeer"         "Lenawee"        "Livingston"     "Macomb"        
+[36] "Manistee"       "Marquette"      "Mason"          "Midland"        "Monroe"        
+[41] "Montcalm"       "Muskegon"       "Newaygo"        "Oakland"        "Oceana"        
+[46] "Ogemaw"         "Osceola"        "Ottawa"         "Saginaw"        "St. Clair"     
+[51] "St. Joseph"     "Sanilac"        "Shiawassee"     "Tuscola"        "Washtenaw"     
+[56] "Wayne" 
 
-3. **Counties needing alternative approaches:** [List counties with low confidence data and suggest specific alternatives - manual review, additional surveys, etc.]
+2. **Counties requiring additional oversight:**
+
+[1] "Alger"        "Baraga"       "Benzie"       "Crawford"     "Delta"        "Emmet"       
+ [7] "Gogebic"      "Iosco"        "Iron"         "Kalkaska"     "Lake"         "Leelanau"    
+[13] "Luce"         "Mackinac"     "Mecosta"      "Menominee"    "Missaukee"    "Montmorency" 
+[19] "Ontonagon"    "Oscoda"       "Otsego"       "Presque Isle" "Roscommon"    "Van Buren"   
+[25] "Wexford"  
+
+These are counties where we are moderately confident in the data of. The data isn't to be used without monitoring the results for unusual patterns or distributions. If there are odd results, they should be examined more closely to see what may have caused the outlier. These data should also be examined to see what shape the raw data forms, before conducting any analysis. If the distribution, skew or peaks look abnormal, or there are too many outliers, that county may not be used to that specific analysis. Judgments should be made on a case-to-case basis.
+
+3. **Counties needing alternative approaches:** 
+
+[1] "Keweenaw"    "Schoolcraft"
+
+There are only two counties in Michigan where we are not confident in the reliability of the data at all, and more data from these counties should be collected if possible. First, we should try to find out why these two counties were specifically unreliable in data, such as examining the sample size. As seen in earlier analysis, these counties are in the top 5 smallest counties in Michigan, which may definitely cause the unreliability. In this case, we should go out of our way to collect more data from this county to ensure the data becomes more reliable, as the ACS is a sample and more data can be collected. If this doesn't work, perhaps we should consider merging these counties with neighboring counties, especially if there are no major differences between the two areas. If there are massive differences, then maybe we should take a closer look at these counties in general to see why such disparities happen, and work on ameliorating that.
 
 ## Questions for Further Investigation
 
 [List 2-3 questions that your analysis raised that you'd like to explore further in future assignments. Consider questions about spatial patterns, time trends, or other demographic factors.]
+
+1. How does data unreliability change as we look at different data? 
+
+2. Is sample size the biggest factor in swaying reliability, or is there something else, and can that be examined by looking at differences between different data?
+
+3. In Michigan, there are ethnic enclaves (Japanese, Chinese, Korean, Middle Eastern) which the 3 races in these analyses don't cover. How would including those change the analyses done here today?
 
 # Technical Notes
 
@@ -437,7 +502,7 @@ race_n_high_MOE
 - Complete code and documentation available at: [your portfolio URL]
 
 **Methodology Notes:**
-[Describe any decisions you made about data processing, county selection, or analytical choices that might affect reproducibility]
+In 4.2, the last question, I manually inputted the table data, instead of using reproducible variables.
 
 **Limitations:**
 [Note any limitations in your analysis - sample size issues, geographic scope, temporal factors, etc.]
