@@ -48,22 +48,36 @@ Load the required spatial data:
 **Your Task:**
 ```{r}
 # Load required packages
-
+library(sf)
+library(tidyverse)
+library(tigris)
+library(tidycensus)
+library(scales)
+library(patchwork)
+library(here)
+library(xts)
 
 # Load spatial data
-
-
-
+pa_counties <- st_read(here("labs/lab_2/data/Pennsylvania_County_Boundaries.shp"))
+hospitals <- st_read(here("labs/lab_2/data/hospitals.geojson"))
+census_tracts <- tracts(state = "PA", cb = TRUE)
 
 # Check that all data loaded correctly
 
+# check crs
+st_crs(pa_counties)
+st_crs(hospitals)
+st_crs(census_tracts)
 
+# standardize crs
+pa_counties <- st_transform(pa_counties, st_crs(hospitals))
+census_tracts <- st_transform(census_tracts, st_crs(hospitals))
 ```
 
 **Questions to answer:**
-- How many hospitals are in your dataset?
-- How many census tracts?
-- What coordinate reference system is each dataset in?
+- How many hospitals are in your dataset? **223**
+- How many census tracts? **3445**
+- What coordinate reference system is each dataset in? **WGS 84 / pseudo mercator, WGS 84, NAD --> standardized to hospital dataset's CRS which is WGS 84.**
 
 ---
 
@@ -79,19 +93,64 @@ Use `tidycensus` to download tract-level demographic data for Pennsylvania.
 **Your Task:**
 ```{r}
 # Get demographic data from ACS
+acs_vars_2022 <- load_variables(2022, "acs5", cache = TRUE)
+acs_vars <- c(
+  total_pop = "B01003_001",
+  med_HH_income = "B19013_001",
+  m_6566 = "B01001_020",
+  m_6769 = "B01001_021",
+  m_7074 = "B01001_022", 
+  m_7579 = "B01001_023", 
+  m_8084 = "B01001_024", 
+  m_85over = "B01001_025",
+  f_6566 = "B01001_044", 
+  f_6769 = "B01001_045", 
+  f_7074 = "B01001_046", 
+  f_7579 = "B01001_047", 
+  f_8084 = "B01001_048", 
+  f_85over = "B01001_049"
+)
 
+demo_data <- get_acs(geography = "tract",
+  variables = acs_vars,
+  state = "PA", survey = "acs5", year = 2022, output = "wide"
+  ) %>%
+  mutate(over_65E = m_6566E+m_6769E+m_7074E+m_7579E+m_8084E+m_85overE
+         +f_6566E+f_6769E+f_7074E+f_7579E+f_8084E+f_85overE) %>%
+  select(-c(m_6566E,m_6769E,m_7074E,m_7579E,m_8084E,m_85overE,
+         f_6566E,f_6769E,f_7074E,f_7579E,f_8084E,f_85overE,
+         m_6566M,m_6769M,m_7074M,m_7579M,m_8084M,m_85overM,
+         f_6566M,f_6769M,f_7074M,f_7579M,f_8084M,f_85overM))
+# %>%
+#   mutate(NAME = str_extract(NAME, "Census Tract [0-9.]+"))
 
-
+#wasn't joining because there was one census tract difference --> check what's in demo_data but not 
+#census_tracts --> one census with total pop of 0 --> get rid of and then join again
+diff <- setdiff(demo_data$GEOID, census_tracts$GEOID)
+diff_row <- which(demo_data$GEOID == diff)
+demo_data <- demo_data[-diff_row,]
 
 # Join to tract boundaries
+# tracts_demodata <- census_tracts %>%
+#   left_join(demo_data %>% select(total_popE, total_popM, med_HH_incomeE, med_HH_incomeM, over_65E), 
+#             by = "GEOID")
+tracts_demodata <- census_tracts %>%
+  left_join(demo_data %>% select(-c(NAME)), 
+            by = "GEOID")
 
+#how many tracts have missing income data
+missing_income_count <- tracts_demodata %>%
+  count(is.na(med_HH_incomeE))
+missing_income_tracts <- tracts_demodata %>% filter(is.na(med_HH_incomeE))
 
+#calculate mean of all median incomes
+all_med_inc <- mean(tracts_demodata$med_HH_incomeE, na.rm = TRUE)
 ```
 
 **Questions to answer:**
-- What year of ACS data are you using?
-- How many tracts have missing income data?
-- What is the median income across all PA census tracts?
+- What year of ACS data are you using? **2022**
+- How many tracts have missing income data? **62**
+- What is the median income across all PA census tracts? **$77527.23**
 
 ---
 
@@ -105,16 +164,28 @@ Identify census tracts with vulnerable populations based on TWO criteria:
 ```{r}
 # Filter for vulnerable tracts based on your criteria
 
+#taking out rows with missing median income data
+missing_inc_rows <- which(is.na(tracts_demodata$med_HH_incomeE))
+avail_inc_data <- tracts_demodata[-missing_inc_rows,]
 
+# 1. chose <60K as low median HH income
+# 2. adding column of percentage of elderly population --> chose 17% as sig
+# elderly pop threshold
+avail_inc_data <- avail_inc_data %>%
+  mutate(elderly_per = over_65E/total_popE*100)
 
+#filter out vulnerable tracts
+vul_pop <- avail_inc_data %>% filter(med_HH_incomeE < 60000 & elderly_per >= 17)
 
+#percent of PA CT that are vulnerable
+PA_per_vul <- nrow(vul_pop)/nrow(census_tracts)*100
 ```
 
 **Questions to answer:**
-- What income threshold did you choose and why?
-- What elderly population threshold did you choose and why?
-- How many tracts meet your vulnerability criteria?
-- What percentage of PA census tracts are considered vulnerable by your definition?
+- What income threshold did you choose and why? **$60,000 because ____**
+- What elderly population threshold did you choose and why? **17% because the national proportion for population over 65 is around 16.85%**
+- How many tracts meet your vulnerability criteria? **574**
+- What percentage of PA census tracts are considered vulnerable by your definition? **16.67%*
 
 ---
 
@@ -125,13 +196,28 @@ For each vulnerable tract, calculate the distance to the nearest hospital.
 **Your Task:**
 ```{r}
 # Transform to appropriate projected CRS
-
+st_crs(vul_pop)
+# in WGS 84
 
 # Calculate distance from each tract centroid to nearest hospital
+vul_tract_centroid <- st_centroid(vul_pop)
 
+nearest_index <- st_nearest_feature(vul_tract_centroid, hospitals)
 
+nearest_dist <- st_distance(vul_tract_centroid, hospitals[nearest_index,],
+                            by_element = TRUE)
 
+vul_pop$nearest_hosp <- as.numeric(nearest_dist/1609.344) #make it in km's
 
+# avg distance to hospitals for all vulnerable tracts
+avg_hosp_dist <- mean(vul_pop$nearest_hosp, na.rm = TRUE)
+
+# maximum distance
+max_dist <- vul_pop %>% slice_max(nearest_hosp, n=1)
+
+# >15 miles
+more_15 <- vul_pop %>% filter(nearest_hosp > 15)
+nrow(more_15)
 ```
 
 **Requirements:**
@@ -153,10 +239,13 @@ Define "underserved" as vulnerable tracts that are more than 15 miles from the n
 **Your Task:**
 ```{r}
 # Create underserved variable
+underserved <- more_15
 
+#how many
+nrow(more_15)
 
-
-
+#per_underserved
+per_und <- nrow(underserved)/nrow(vul_pop)*100
 ```
 
 **Questions to answer:**
@@ -172,12 +261,24 @@ Use spatial joins and aggregation to calculate county-level statistics about vul
 
 **Your Task:**
 ```{r}
-# Spatial join tracts to counties
+#add underserved status to vul_pop
+vul_pop <- vul_pop %>% 
+  mutate(underserved = case_when(nearest_hosp > 15 ~ 'Underserved',
+                                   TRUE ~ 'Appropriately Served'))
 
+# Spatial join tracts to counties
+tracts_by_county <- vul_pop %>%
+  st_join(pa_counties %>% select(COUNTY_NAM)) %>%
+  st_drop_geometry() %>%
+  group_by(COUNTY_NAM) %>%
+  summarize(
+    n_tracts = n_distinct(GEOID),
+    tract_ids = paste(unique(NAMELSAD), collapse = ", "),
+    n_underserved = sum(underserved == "Underserved")
+  ) %>%
+  arrange(desc(n_tracts))
 
 # Aggregate statistics by county
-
-
 
 
 ```
