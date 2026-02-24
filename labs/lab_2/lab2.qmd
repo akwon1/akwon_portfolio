@@ -46,7 +46,9 @@ Load the required spatial data:
 - Pennsylvania census tracts
 
 **Your Task:**
-```{r}
+```{r, results='hide'}
+#| echo: false
+
 # Load required packages
 library(sf)
 library(tidyverse)
@@ -56,6 +58,7 @@ library(scales)
 library(patchwork)
 library(here)
 library(xts)
+library(kableExtra)
 
 # Load spatial data
 pa_counties <- st_read(here("labs/lab_2/data/Pennsylvania_County_Boundaries.shp"))
@@ -91,7 +94,7 @@ Use `tidycensus` to download tract-level demographic data for Pennsylvania.
 - Population 65 years and over (you may need to sum multiple age categories)
 
 **Your Task:**
-```{r}
+```{r, results='hide'}
 # Get demographic data from ACS
 acs_vars_2022 <- load_variables(2022, "acs5", cache = TRUE)
 acs_vars <- c(
@@ -161,7 +164,7 @@ Identify census tracts with vulnerable populations based on TWO criteria:
 2. Significant elderly population (choose an appropriate threshold)
 
 **Your Task:**
-```{r}
+```{r, results='hide'}
 # Filter for vulnerable tracts based on your criteria
 
 #taking out rows with missing median income data
@@ -194,7 +197,7 @@ PA_per_vul <- nrow(vul_pop)/nrow(census_tracts)*100
 For each vulnerable tract, calculate the distance to the nearest hospital.
 
 **Your Task:**
-```{r}
+```{r, results='hide'}
 # Transform to appropriate projected CRS
 st_crs(vul_pop)
 # in WGS 84
@@ -226,9 +229,9 @@ nrow(more_15)
 - Explain why you chose your projection
 
 **Questions to answer:**
-- What is the average distance to the nearest hospital for vulnerable tracts?
-- What is the maximum distance?
-- How many vulnerable tracts are more than 15 miles from the nearest hospital?
+- What is the average distance to the nearest hospital for vulnerable tracts? **4.94 miles**
+- What is the maximum distance? **29.06 miles**
+- How many vulnerable tracts are more than 15 miles from the nearest hospital? **34 tracts**
 
 ---
 
@@ -237,7 +240,7 @@ nrow(more_15)
 Define "underserved" as vulnerable tracts that are more than 15 miles from the nearest hospital.
 
 **Your Task:**
-```{r}
+```{r, results='hide'}
 # Create underserved variable
 underserved <- more_15
 
@@ -249,9 +252,9 @@ per_und <- nrow(underserved)/nrow(vul_pop)*100
 ```
 
 **Questions to answer:**
-- How many tracts are underserved?
-- What percentage of vulnerable tracts are underserved?
-- Does this surprise you? Why or why not?
+- How many tracts are underserved? **34 tracts**
+- What percentage of vulnerable tracts are underserved? **5.92% of vulnerable tracts are underserved**
+- Does this surprise you? Why or why not? **This surprises me a little bit, as it was quite low and I assumed tracts with vulnerable populations would be generally underserved in most aspects, as one of the criteria was low income. However, I see that this may happen because despite the low income, counties and local governments might have prepared ahead for the vulnerable populations, knowing they would need the hospitals more.**
 
 ---
 
@@ -260,7 +263,7 @@ per_und <- nrow(underserved)/nrow(vul_pop)*100
 Use spatial joins and aggregation to calculate county-level statistics about vulnerable populations and hospital access.
 
 **Your Task:**
-```{r}
+```{r, results='hide'}
 #add underserved status to vul_pop
 vul_pop <- vul_pop %>% 
   mutate(underserved = case_when(nearest_hosp > 15 ~ 'Underserved',
@@ -287,22 +290,39 @@ outside_hosp <- st_difference(pa_counties, combined_service_area)
 #   ) +
 #   theme_void()
 
-#ppl over 65 living outside hospital service area
-over65_summary <- vul_pop %>%
+#ppl living outside hospital service area
+pop_summary <- vul_pop %>%
   st_join(outside_hosp %>% select(COUNTY_NAM)) %>%
   st_drop_geometry() %>%
   group_by(COUNTY_NAM) %>%
   summarize(
-    total_vul_pop = sum(total_popE, na.rm = TRUE),
+    pop_outHosp = sum(total_popE, na.rm = TRUE),
     .groups = "drop"
   )
-over65_outside_hosp <- pa_counties %>%
+pop_outside_hosp <- pa_counties %>%
   select(COUNTY_NAM) %>%
   st_drop_geometry() %>%
-  left_join(over65_summary, by = "COUNTY_NAM") %>%
+  left_join(pop_summary, by = "COUNTY_NAM") %>%
   mutate(
-    total_vul_pop = coalesce(total_vul_pop, 0)
+    pop_outHosp = coalesce(pop_outHosp, 0)
   )
+
+# #ppl over 65 living outside hospital service area
+# over65_summary <- vul_pop %>%
+#   st_join(outside_hosp %>% select(COUNTY_NAM)) %>%
+#   st_drop_geometry() %>%
+#   group_by(COUNTY_NAM) %>%
+#   summarize(
+#     total_vul_pop = sum(over_65E, na.rm = TRUE),
+#     .groups = "drop"
+#   )
+# over65_outside_hosp <- pa_counties %>%
+#   select(COUNTY_NAM) %>%
+#   st_drop_geometry() %>%
+#   left_join(over65_summary, by = "COUNTY_NAM") %>%
+#   mutate(
+#     total_vul_pop = coalesce(total_vul_pop, 0)
+#   )
 
 # Spatial join tracts to counties
 tracts_by_county <- vul_pop %>%
@@ -321,28 +341,49 @@ tracts_by_county <- vul_pop %>%
 # Aggregate statistics by county
 
 # percent of vul tracts that are underserved
+#total
+34/574*100
+#per county
 tracts_by_county <- tracts_by_county %>%
   mutate(per_underserved = n_underserved/n_tracts*100)
 
+# total vul pop in PA
+sum(vul_pop$total_popE)
+
 # top 5 counties w highest percentage of underserved vul tracts
 highest_per_und_vul <- tracts_by_county %>% slice_max(per_underserved, n=5)
+highest_per_und_vul_10 <- tracts_by_county %>% slice_max(per_underserved, n=10)
 
 # counties w the most vul ppl living far from hospitals
-tracts_by_county <- tracts_by_county %>% left_join(over65_outside_hosp, by = "COUNTY_NAM")
-most_vul <- tracts_by_county %>% arrange(desc(total_vul_pop))
+tracts_by_county <- tracts_by_county %>% left_join(pop_outside_hosp, by = "COUNTY_NAM")
+# tracts_by_county <- tracts_by_county %>% left_join(over65_outside_hosp, by = "COUNTY_NAM")
+most_vul <- tracts_by_county %>% arrange(desc(pop_outHosp))
 ```
 
 **Required county-level statistics:**
-- Number of vulnerable tracts
-- Number of underserved tracts  
-- Percentage of vulnerable tracts that are underserved
-- Average distance to nearest hospital for vulnerable tracts
-- Total vulnerable population
+- Number of vulnerable tracts **574 vulnerable tracts**
+- Number of underserved tracts  **34 underserved tracts**
+- Percentage of vulnerable tracts that are underserved  **5.92% are underserved**
+- Average distance to nearest hospital for vulnerable tracts  **4.94 miles**
+- Total vulnerable population in PA **1802220**
 
 **Questions to answer:**
 - Which 5 counties have the highest percentage of underserved vulnerable tracts?
 - Which counties have the most vulnerable people living far from hospitals?
-- Are there any patterns in where underserved counties are located?
+- Are there any patterns in where underserved counties are located? **For high proportion of underserved tracts, it makes sense that most of the counties are smaller ones, with small total number of tracts. For counties with the most vulnerable people living far from hospitals, it makes sense that it would be slightly bigger counties, where people are more spread apart.**
+
+```{r}
+kable(highest_per_und_vul[, c(1,3,5,7)], "simple", 
+      col.names = c("County Name", "# of Tracts", "# of Underserved Tracts", 
+                    "% of Underserved Tracts"), 
+      caption = "Which 5 counties have the highest percentage of underserved vulnerable tracts?")
+
+kable(most_vul[, c(1,8,2, 3,5,7,6)], "simple", 
+      col.names = c("County Name", "Population >15 miles of Hospitals", "Total Population", 
+                    "# of Tracts", "# of Underserved Tracts", "% of Underserved Tracts",
+                    "Average Distance to Hospitals"), 
+      caption = "Which counties have the most vulnerable people living far from hospitals?")
+```
 
 ---
 
@@ -353,10 +394,11 @@ Create a professional table showing the top 10 priority counties for healthcare 
 **Your Task:**
 ```{r}
 # Create and format priority counties table
-
-
-
-
+kable(highest_per_und_vul_10[, c(1,2,3,5,7,6,8)], "simple", 
+      col.names = c("County Name","Total Population", "# of Tracts", "# of Underserved Tracts", 
+                    "% of Underserved Tracts", "Average Distance to Hospitals", 
+                    "Population Living >15 Miles from a Hospital"), 
+      caption = "Top 10 priority counties for healthcare investment")
 ```
 
 **Requirements:**
@@ -457,7 +499,7 @@ Choose your own additional spatial dataset and conduct a supplementary analysis.
    - Check and standardize the CRS
    - Provide basic summary statistics
 
-```{r}
+```{r, results='hide'}
 # Load your additional dataset
 od_deaths <- st_read(here("labs/lab_2/data/Estimated Drug Overdose Deaths CY 2012-Current County Health_20260223.shp"))
 ems_stations <- st_read(here("labs/lab_2/data/Fire_and_Emergency_Medical_Service__EMS__Stations_pt.shp"))
@@ -500,7 +542,7 @@ Use at least TWO spatial operations to answer your research question.
 - Point-in-polygon aggregation
 
 **Your Task:**
-```{r}
+```{r, results='hide'}
 # Your spatial analysis
 od_deaths$county <- toupper(od_deaths$county)
 
