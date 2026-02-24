@@ -266,21 +266,70 @@ vul_pop <- vul_pop %>%
   mutate(underserved = case_when(nearest_hosp > 15 ~ 'Underserved',
                                    TRUE ~ 'Appropriately Served'))
 
+#hospital buffer of 15 miles
+hospital_service_areas <- hospitals %>%
+  st_buffer(dist = 24140)
+hospital_service_areas <- st_transform(hospital_service_areas, st_crs(hospitals))
+combined_service_area <- hospital_service_areas %>%
+  st_union() %>%
+  st_make_valid()
+
+#outside hospital service area
+outside_hosp <- st_difference(pa_counties, combined_service_area)
+
+# ggplot() +
+#   geom_sf(data = pa_counties, fill = "grey", color = "gray") +
+#   geom_sf(data = outside_hosp, fill = "lightblue", alpha = 0.4) +
+#   geom_sf(data = hospitals, color = "red", size = 2) +
+#   labs(
+#     title = paste("outside hospital service area"),
+#     subtitle = "Red points = Hospitals, Blue areas = 15-mile service zones"
+#   ) +
+#   theme_void()
+
+#ppl over 65 living outside hospital service area
+over65_summary <- vul_pop %>%
+  st_join(outside_hosp %>% select(COUNTY_NAM)) %>%
+  st_drop_geometry() %>%
+  group_by(COUNTY_NAM) %>%
+  summarize(
+    total_vul_pop = sum(total_popE, na.rm = TRUE),
+    .groups = "drop"
+  )
+over65_outside_hosp <- pa_counties %>%
+  select(COUNTY_NAM) %>%
+  st_drop_geometry() %>%
+  left_join(over65_summary, by = "COUNTY_NAM") %>%
+  mutate(
+    total_vul_pop = coalesce(total_vul_pop, 0)
+  )
+
 # Spatial join tracts to counties
 tracts_by_county <- vul_pop %>%
   st_join(pa_counties %>% select(COUNTY_NAM)) %>%
   st_drop_geometry() %>%
   group_by(COUNTY_NAM) %>%
   summarize(
+    tot_pop = sum(total_popE),
     n_tracts = n_distinct(GEOID),
     tract_ids = paste(unique(NAMELSAD), collapse = ", "),
-    n_underserved = sum(underserved == "Underserved")
+    n_underserved = sum(underserved == "Underserved"),
+    avg_hosp_dist = mean(nearest_hosp),
   ) %>%
   arrange(desc(n_tracts))
 
 # Aggregate statistics by county
 
+# percent of vul tracts that are underserved
+tracts_by_county <- tracts_by_county %>%
+  mutate(per_underserved = n_underserved/n_tracts*100)
 
+# top 5 counties w highest percentage of underserved vul tracts
+highest_per_und_vul <- tracts_by_county %>% slice_max(per_underserved, n=5)
+
+# counties w the most vul ppl living far from hospitals
+tracts_by_county <- tracts_by_county %>% left_join(over65_outside_hosp, by = "COUNTY_NAM")
+most_vul <- tracts_by_county %>% arrange(desc(total_vul_pop))
 ```
 
 **Required county-level statistics:**
@@ -399,109 +448,6 @@ Create a visualization showing the distribution of distances to hospitals for vu
 
 Choose your own additional spatial dataset and conduct a supplementary analysis.
 
-### Challenge Options
-
-Choose ONE of the following challenge exercises, or propose your own research question using OpenDataPhilly data (https://opendataphilly.org/datasets/). 
-
-**Note these are just loose suggestions to spark ideas - follow or make your own as the data permits and as your ideas evolve. This analysis should include bringing in your own dataset, ensuring the projection/CRS of your layers align and are appropriate for the analysis (not lat/long or geodetic coordinate systems). The analysis portion should include some combination of spatial and attribute operations to answer a relatively straightforward question**
-
----
-
-#### Education & Youth Services
-
-**Option A: Educational Desert Analysis**
-- **Data:** Schools, Libraries, Recreation Centers, Census tracts (child population)
-- **Question:** "Which neighborhoods lack adequate educational infrastructure for children?"
-- **Operations:** Buffer schools/libraries (0.5 mile walking distance), identify coverage gaps, overlay with child population density
-- **Policy relevance:** School district planning, library placement, after-school program siting
-
-**Option B: School Safety Zones**
-- **Data:** Schools, Crime Incidents, Bike Network
-- **Question:** "Are school zones safe for walking/biking, or are they crime hotspots?"
-- **Operations:** Buffer schools (1000ft safety zone), spatial join with crime incidents, assess bike infrastructure coverage
-- **Policy relevance:** Safe Routes to School programs, crossing guard placement
-
----
-
-#### Environmental Justice
-
-**Option C: Green Space Equity** 
-- **Data:** Parks, Street Trees, Census tracts (race/income demographics)
-- **Question:** "Do low-income and minority neighborhoods have equitable access to green space?"
-- **Operations:** Buffer parks (10-minute walk = 0.5 mile), calculate tree canopy or park acreage per capita, compare by demographics
-- **Policy relevance:** Climate resilience, environmental justice, urban forestry investment
----
-
-#### Public Safety & Justice
-
-**Option D: Crime & Community Resources**
-- **Data:** Crime Incidents, Recreation Centers, Libraries, Street Lights
-- **Question:** "Are high-crime areas underserved by community resources?"
-- **Operations:** Aggregate crime counts to census tracts or neighborhoods, count community resources per area, spatial correlation analysis
-- **Policy relevance:** Community investment, violence prevention strategies
----
-
-#### Infrastructure & Services
-
-**Option E: Polling Place Accessibility**
-- **Data:** Polling Places, SEPTA stops, Census tracts (elderly population, disability rates)
-- **Question:** "Are polling places accessible for elderly and disabled voters?"
-- **Operations:** Buffer polling places and transit stops, identify vulnerable populations, find areas lacking access
-- **Policy relevance:** Voting rights, election infrastructure, ADA compliance
-
----
-
-#### Health & Wellness
-
-**Option F: Recreation & Population Health**
-- **Data:** Recreation Centers, Playgrounds, Parks, Census tracts (demographics)
-- **Question:** "Is lack of recreation access associated with vulnerable populations?"
-- **Operations:** Calculate recreation facilities per capita by neighborhood, buffer facilities for walking access, overlay with demographic indicators
-- **Policy relevance:** Public health investment, recreation programming, obesity prevention
-
----
-
-#### Emergency Services
-
-**Option G: EMS Response Coverage**
-- **Data:** Fire Stations, EMS stations, Population density, High-rise buildings
-- **Question:** "Are population-dense areas adequately covered by emergency services?"
-- **Operations:** Create service area buffers (5-minute drive = ~2 miles), assess population coverage, identify gaps in high-density areas
-- **Policy relevance:** Emergency preparedness, station siting decisions
-
----
-
-#### Arts & Culture
-
-**Option H: Cultural Asset Distribution**
-- **Data:** Public Art, Museums, Historic sites/markers, Neighborhoods
-- **Question:** "Do all neighborhoods have equitable access to cultural amenities?"
-- **Operations:** Count cultural assets per neighborhood, normalize by population, compare distribution across demographic groups
-- **Policy relevance:** Cultural equity, tourism, quality of life, neighborhood identity
-
----
-
-### Data Sources
-
-**OpenDataPhilly:** https://opendataphilly.org/datasets/
-- Most datasets available as GeoJSON, Shapefile, or CSV with coordinates
-- Always check the Metadata for a data dictionary of the fields.
-
-**Additional Sources:**
-- **Pennsylvania Open Data:** https://data.pa.gov/
-- **Census Bureau (via tidycensus):** Demographics, economic indicators, commute patterns
-- **TIGER/Line (via tigris):** Geographic boundaries
-
-### Recommended Starting Points
-
-**If you're feeling confident:** Choose an advanced challenge with multiple data layers. 
-**If you are a beginner, choose something more manageable that helps you understand the basics**
-
-
-**If you have a different idea:** Propose your own question! Just make sure:
-- You can access the spatial data
-- You can perform at least 2 spatial operations
-
 ### Your Analysis
 
 **Your Task:**
@@ -513,10 +459,11 @@ Choose ONE of the following challenge exercises, or propose your own research qu
 
 ```{r}
 # Load your additional dataset
+od_deaths <- st_read(here("labs/lab_2/data/Estimated Drug Overdose Deaths CY 2012-Current County Health_20260223.shp"))
+ems_stations <- st_read(here("labs/lab_2/data/Fire_and_Emergency_Medical_Service__EMS__Stations_pt.shp"))
 
-
-
-
+od_deaths <- st_transform(od_deaths, st_crs(hospitals))
+ems_stations <- st_transform(ems_stations, st_crs(hospitals))
 ```
 
 **Questions to answer:**
@@ -536,6 +483,8 @@ Write a clear research statement that your analysis will answer.
 - "Are EMS stations appropriately located near vulnerable populations?"
 - "Do areas with low vehicle access have worse hospital access?"
 
+Are there more opioid overdoses in vulnerable areas?
+
 ---
 
 3. **Conduct spatial analysis**
@@ -553,15 +502,27 @@ Use at least TWO spatial operations to answer your research question.
 **Your Task:**
 ```{r}
 # Your spatial analysis
+od_deaths$county <- toupper(od_deaths$county)
 
+#summarize od deaths by county
+od_by_county <- od_deaths %>%
+  filter(year == 2024) %>%
+  st_join(pa_counties %>% select(COUNTY_NAM)) %>%
+  st_drop_geometry() %>%
+  group_by(COUNTY_NAM) %>%
+  summarize(
+    n_od_2024 = sum(count, na.rm = TRUE)
+  )
 
+#join od deaths to counties
+tracts_by_county <- tracts_by_county %>% left_join(od_by_county, by = "COUNTY_NAM")
 
-
-
-
-
-
-
+#percentage of vulnerable ppl of total pop & od deaths:vulnerable ppl ratio
+tracts_by_county <- tracts_by_county %>%
+  mutate(per_vul = total_vul_pop/tot_pop*100,
+         od_vul_ratio = n_od_2024/total_vul_pop*100)
+tracts_by_county$od_vul_ratio[is.infinite(tracts_by_county$od_vul_ratio)] <- 0
+tracts_by_county$od_vul_ratio[is.nan(tracts_by_county$od_vul_ratio)] <- 0
 
 ```
 
@@ -578,7 +539,7 @@ Use at least TWO spatial operations to answer your research question.
 
 
 ## Finally - A few comments about your incorporation of feedback!
-Take a few moments to clean up your markdown document and then write a line or two or three about how you may have incorporated feedback that you recieved after your first assignment. 
+Take a few moments to clean up your markdown document and then write a line or two or three about how you may have incorporated feedback that you received after your first assignment. 
 
 ---
 
