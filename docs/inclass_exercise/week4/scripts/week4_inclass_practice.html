@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Angie Kwon">
-<meta name="dcterms.date" content="2026-02-23">
+<meta name="dcterms.date" content="2026-02-24">
 
 <title>Week 4 In-Class Practice Exercises – Angie Kwon - MUSA 5080 Portfolio</title>
 <style>
@@ -227,7 +227,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">February 23, 2026</p>
+      <p class="date">February 24, 2026</p>
     </div>
   </div>
   
@@ -252,8 +252,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Set your Census API key if you haven't already</span></span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">census_api_key</span>(<span class="fu">Sys.getenv</span>(<span class="st">"CENSUS_API_KEY"</span>))</span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Load the data (same as lecture)</span></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>pa_counties <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="fu">here</span>(<span class="st">"data/Pennsylvania_County_Boundaries.shp"</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">setwd</span>(<span class="st">"/Users/angiekwon/Documents/GitHub/akwon_portfolio/inclass_exercise/week4/data"</span>)</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Load the data (same as lecture)</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>pa_counties <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="st">"/Users/angiekwon/Documents/GitHub/akwon_portfolio/inclass_exercise/week4/data/Pennsylvania_County_Boundaries.shp"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Reading layer `Pennsylvania_County_Boundaries' from data source 
   `/Users/angiekwon/Documents/GitHub/akwon_portfolio/inclass_exercise/week4/data/Pennsylvania_County_Boundaries.shp' 
@@ -264,7 +266,7 @@ Dimension:     XY
 Bounding box:  xmin: -8963377 ymin: 4825316 xmax: -8314404 ymax: 5201413
 Projected CRS: WGS 84 / Pseudo-Mercator</code></pre>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>districts <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="fu">here</span>(<span class="st">"data/districts.geojson"</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>districts <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="st">"/Users/angiekwon/Documents/GitHub/akwon_portfolio/inclass_exercise/week4/data/districts.geojson"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Reading layer `U.S._Congressional_Districts_for_Pennsylvania' from data source 
   `/Users/angiekwon/Documents/GitHub/akwon_portfolio/inclass_exercise/week4/data/districts.geojson' 
@@ -275,7 +277,7 @@ Dimension:     XY
 Bounding box:  xmin: -80.51939 ymin: 39.71986 xmax: -74.68956 ymax: 42.26935
 Geodetic CRS:  WGS 84</code></pre>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>hospitals <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="fu">here</span>(<span class="st">"data/hospitals.geojson"</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>hospitals <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="st">"/Users/angiekwon/Documents/GitHub/akwon_portfolio/inclass_exercise/week4/data/hospitals.geojson"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Reading layer `hospitals' from data source 
   `/Users/angiekwon/Documents/GitHub/akwon_portfolio/inclass_exercise/week4/data/hospitals.geojson' 
@@ -292,15 +294,13 @@ Geodetic CRS:  WGS 84</code></pre>
   |                                                                            
   |                                                                      |   0%
   |                                                                            
-  |                                                                      |   1%
+  |=                                                                     |   1%
   |                                                                            
   |=                                                                     |   2%
   |                                                                            
   |==                                                                    |   3%
   |                                                                            
   |===                                                                   |   4%
-  |                                                                            
-  |===                                                                   |   5%
   |                                                                            
   |====                                                                  |   5%
   |                                                                            
@@ -314,7 +314,7 @@ Geodetic CRS:  WGS 84</code></pre>
   |                                                                            
   |=======                                                               |  10%
   |                                                                            
-  |========                                                              |  11%
+  |=======                                                               |  11%
   |                                                                            
   |========                                                              |  12%
   |                                                                            

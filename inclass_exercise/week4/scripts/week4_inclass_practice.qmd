@@ -27,10 +27,12 @@ library(here)
 # Set your Census API key if you haven't already
 census_api_key(Sys.getenv("CENSUS_API_KEY"))
 
+setwd("/Users/angiekwon/Documents/GitHub/akwon_portfolio/inclass_exercise/week4/data")
+
 # Load the data (same as lecture)
-pa_counties <- st_read(here("data/Pennsylvania_County_Boundaries.shp"))
-districts <- st_read(here("data/districts.geojson"))
-hospitals <- st_read(here("data/hospitals.geojson"))
+pa_counties <- st_read("/Users/angiekwon/Documents/GitHub/akwon_portfolio/inclass_exercise/week4/data/Pennsylvania_County_Boundaries.shp")
+districts <- st_read("/Users/angiekwon/Documents/GitHub/akwon_portfolio/inclass_exercise/week4/data/districts.geojson")
+hospitals <- st_read("/Users/angiekwon/Documents/GitHub/akwon_portfolio/inclass_exercise/week4/data/hospitals.geojson")
 census_tracts <- tracts(state = "PA", cb = TRUE)
 metro_areas <- core_based_statistical_areas(cb = TRUE)
 

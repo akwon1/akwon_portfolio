@@ -268,7 +268,7 @@ Use spatial joins and aggregation to calculate county-level statistics about vul
 vul_pop <- vul_pop %>% 
   mutate(underserved = case_when(nearest_hosp > 15 ~ 'Underserved',
                                    TRUE ~ 'Appropriately Served'))
-
+vul_pop <- st_transform(vul_pop, st_crs(hospitals))
 #hospital buffer of 15 miles
 hospital_service_areas <- hospitals %>%
   st_buffer(dist = 24140)
@@ -308,21 +308,21 @@ pop_outside_hosp <- pa_counties %>%
   )
 
 # #ppl over 65 living outside hospital service area
-# over65_summary <- vul_pop %>%
-#   st_join(outside_hosp %>% select(COUNTY_NAM)) %>%
-#   st_drop_geometry() %>%
-#   group_by(COUNTY_NAM) %>%
-#   summarize(
-#     total_vul_pop = sum(over_65E, na.rm = TRUE),
-#     .groups = "drop"
-#   )
-# over65_outside_hosp <- pa_counties %>%
-#   select(COUNTY_NAM) %>%
-#   st_drop_geometry() %>%
-#   left_join(over65_summary, by = "COUNTY_NAM") %>%
-#   mutate(
-#     total_vul_pop = coalesce(total_vul_pop, 0)
-#   )
+over65_summary <- vul_pop %>%
+  st_join(outside_hosp %>% select(COUNTY_NAM)) %>%
+  st_drop_geometry() %>%
+  group_by(COUNTY_NAM) %>%
+  summarize(
+    total_vul_pop = sum(over_65E, na.rm = TRUE),
+    .groups = "drop"
+  )
+over65_outside_hosp <- pa_counties %>%
+  select(COUNTY_NAM) %>%
+  st_drop_geometry() %>%
+  left_join(over65_summary, by = "COUNTY_NAM") %>%
+  mutate(
+    total_vul_pop = coalesce(total_vul_pop, 0)
+  )
 
 # Spatial join tracts to counties
 tracts_by_county <- vul_pop %>%
@@ -384,7 +384,6 @@ kable(most_vul[, c(1,8,2, 3,5,7,6)], "simple",
                     "Average Distance to Hospitals"), 
       caption = "Which counties have the most vulnerable people living far from hospitals?")
 ```
-
 ---
 
 #### Step 7: Create Summary Table 
@@ -394,20 +393,12 @@ Create a professional table showing the top 10 priority counties for healthcare 
 **Your Task:**
 ```{r}
 # Create and format priority counties table
-kable(highest_per_und_vul_10[, c(1,2,3,5,7,6,8)], "simple", 
+kable(highest_per_und_vul_10[, c(1,2,3,5,7,6)], "simple", 
       col.names = c("County Name","Total Population", "# of Tracts", "# of Underserved Tracts", 
-                    "% of Underserved Tracts", "Average Distance to Hospitals", 
-                    "Population Living >15 Miles from a Hospital"), 
+                    "% of Underserved Tracts", "Average Distance to Hospitals"), 
       caption = "Top 10 priority counties for healthcare investment")
+
 ```
-
-**Requirements:**
-- Use `knitr::kable()` or similar for formatting
-- Include descriptive column names
-- Format numbers appropriately (commas for population, percentages, etc.)
-- Add an informative caption
-- Sort by priority (you decide the metric)
-
 ---
 
 ## Part 2: Comprehensive Visualization 
@@ -419,22 +410,54 @@ Using the skills from Week 3 (Data Visualization), create publication-quality ma
 Create a choropleth map showing healthcare access challenges at the county level.
 
 **Your Task:**
-```{r}
-# Create county-level access map
+```{r, results='hide'}
+#| echo: false
 
+# Spatial join tracts to counties
+tracts_by_county <- vul_pop %>%
+  st_join(pa_counties %>% select(COUNTY_NAM)) %>%
+  group_by(COUNTY_NAM) %>%
+  summarize(
+    tot_pop = sum(total_popE),
+    n_tracts = n_distinct(GEOID),
+    tract_ids = paste(unique(NAMELSAD), collapse = ", "),
+    n_underserved = sum(underserved == "Underserved"),
+    avg_hosp_dist = mean(nearest_hosp),
+  ) %>%
+  arrange(desc(n_tracts))
+tracts_by_county <- tracts_by_county %>%
+  mutate(per_underserved = n_underserved/n_tracts*100)
+# total vul pop in PA
+sum(vul_pop$total_popE)
 
+# top 5 counties w highest percentage of underserved vul tracts
+highest_per_und_vul <- tracts_by_county %>% slice_max(per_underserved, n=5)
+highest_per_und_vul_10 <- tracts_by_county %>% slice_max(per_underserved, n=10)
 
-
+# counties w the most vul ppl living far from hospitals
+tracts_by_county <- tracts_by_county %>% left_join(pop_outside_hosp, by = "COUNTY_NAM")
+# tracts_by_county <- tracts_by_county %>% left_join(over65_outside_hosp, by = "COUNTY_NAM")
+most_vul <- tracts_by_county %>% arrange(desc(pop_outHosp))
 ```
 
-**Requirements:**
-- Fill counties by percentage of vulnerable tracts that are underserved
-- Include hospital locations as points
-- Use an appropriate color scheme
-- Include clear title, subtitle, and caption
-- Use `theme_void()` or similar clean theme
-- Add a legend with formatted labels
-
+```{r}
+#| echo: false
+# Create county-level access map
+ggplot(tracts_by_county) +
+  geom_sf(data = pa_counties, fill = "lightgrey", color = "lightgray") +
+  geom_sf(aes(fill = per_underserved), color = "white", size = 0.5) +
+  geom_sf(data = hospitals, color = "red", size = 0.5) +
+  scale_fill_viridis_c(
+    name = "% of Underserved\nTracts",
+    option = "plasma"
+  ) +
+  labs(
+    title = "% of vulnerable tracts that are underserved",
+    subtitle = "Pennsylvania",
+    caption = "Source: ACS 2022"
+  ) +
+  theme_void()
+```
 ---
 
 ### Map 2: Detailed Vulnerability Map 
@@ -443,20 +466,24 @@ Create a map highlighting underserved vulnerable tracts.
 
 **Your Task:**
 ```{r}
+#| echo: false
 # Create detailed tract-level map
-
-
-
-
+ggplot(underserved) +
+  geom_sf(data = pa_counties, fill = "lightgrey", color = "lightgray") +
+  geom_sf(aes(fill = nearest_hosp), color = "white", size = 0.5) +
+  geom_sf(data = hospital_service_areas, fill = "lightblue", color = "lightblue", alpha = 0.2) +
+  geom_sf(data = hospitals, color = "red", size = 0.5) +
+  scale_fill_viridis_c(
+    name = "Distance to \nClosest Hospital (Mile)",
+    option = "plasma"
+  ) +
+  labs(
+    title = "Underserved vulnerables and distance to nearest hospital",
+    subtitle = "Pennsylvania",
+    caption = "Source: ACS 2022"
+  ) +
+  theme_void()
 ```
-
-**Requirements:**
-- Show underserved vulnerable tracts in a contrasting color
-- Include county boundaries for context
-- Show hospital locations
-- Use appropriate visual hierarchy (what should stand out?)
-- Include informative title and subtitle
-
 ---
 
 ### Chart: Distribution Analysis
@@ -465,25 +492,19 @@ Create a visualization showing the distribution of distances to hospitals for vu
 
 **Your Task:**
 ```{r}
+#| echo: false
 # Create distribution visualization
-
-
-
-
+ggplot(vul_pop) +
+  aes(x = nearest_hosp) +
+  geom_histogram(bins = 15, fill = "steelblue", color = "white", alpha = 0.9) +
+  labs(
+    title = "Distribution of Distances to Nearest Hospital",
+    x = "Distance to Nearest Hospital (Mile)",
+    y = "Number of Tracts",
+    caption = "Source: ACS 2022 \nSkews towards the left, showing that most tracts are less than 10  miles from the nearest hospital."
+  ) +
+  theme_minimal()
 ```
-
-**Suggested chart types:**
-- Histogram or density plot of distances
-- Box plot comparing distances across regions
-- Bar chart of underserved tracts by county
-- Scatter plot of distance vs. vulnerable population size
-
-**Requirements:**
-- Clear axes labels with units
-- Appropriate title
-- Professional formatting
-- Brief interpretation (1-2 sentences as a caption or in text)
-
 ---
 
 ## Part 3: Bring Your Own Data Analysis 
@@ -495,10 +516,6 @@ Choose your own additional spatial dataset and conduct a supplementary analysis.
 **Your Task:**
 
 1. **Find and load additional data**
-   - Document your data source
-   - Check and standardize the CRS
-   - Provide basic summary statistics
-
 ```{r, results='hide'}
 # Load your additional dataset
 od_deaths <- st_read(here("labs/lab_2/data/Estimated Drug Overdose Deaths CY 2012-Current County Health_20260223.shp"))
@@ -509,41 +526,32 @@ ems_stations <- st_transform(ems_stations, st_crs(hospitals))
 ```
 
 **Questions to answer:**
-- What dataset did you choose and why?
-- What is the data source and date?
-- How many features does it contain?
-- What CRS is it in? Did you need to transform it?
+- What dataset did you choose and why? **Estimated Drug Overdose Deaths, because I wanted to examine whether there is a correlative relationship between vulnerable populations and the opioids crisis.**
+- What is the data source and date? **PA Open Data, and the data's year ranges from 2012-2024.**
+- How many features does it contain? **884 data points**
+- What CRS is it in? Did you need to transform it? **WGS 84, transformed just in case**
 
 ---
 
 2. **Pose a research question**
 
-Write a clear research statement that your analysis will answer.
-
-**Examples:**
-- "Do vulnerable tracts have adequate public transit access to hospitals?"
-- "Are EMS stations appropriately located near vulnerable populations?"
-- "Do areas with low vehicle access have worse hospital access?"
-
-Are there more opioid overdoses in vulnerable areas?
+**Are there more opioid overdoses in vulnerable areas?**
 
 ---
 
 3. **Conduct spatial analysis**
-
-Use at least TWO spatial operations to answer your research question.
-
-**Required operations (choose 2+):**
-- Buffers
-- Spatial joins
-- Spatial filtering with predicates
-- Distance calculations
-- Intersections or unions
-- Point-in-polygon aggregation
-
-**Your Task:**
 ```{r, results='hide'}
 # Your spatial analysis
+
+# ems station buffer
+ems_buffer <- ems_stations %>%
+  st_buffer(dist = 10000)
+ems_buffer <- st_transform(ems_buffer, st_crs(hospitals))
+combined_ems_buffer <- ems_buffer %>%
+  st_union() %>%
+  st_make_valid()
+
+# capitalize county names
 od_deaths$county <- toupper(od_deaths$county)
 
 #summarize od deaths by county
@@ -561,39 +569,40 @@ tracts_by_county <- tracts_by_county %>% left_join(od_by_county, by = "COUNTY_NA
 
 #percentage of vulnerable ppl of total pop & od deaths:vulnerable ppl ratio
 tracts_by_county <- tracts_by_county %>%
-  mutate(per_vul = total_vul_pop/tot_pop*100,
-         od_vul_ratio = n_od_2024/total_vul_pop*100)
+  mutate(od_vul_ratio = n_od_2024/tot_pop*100)
 tracts_by_county$od_vul_ratio[is.infinite(tracts_by_county$od_vul_ratio)] <- 0
 tracts_by_county$od_vul_ratio[is.nan(tracts_by_county$od_vul_ratio)] <- 0
-
 ```
 
-**Analysis requirements:**
-- Clear code comments explaining each step
-- Appropriate CRS transformations
-- Summary statistics or counts
-- At least one map showing your findings
-- Brief interpretation of results (3-5 sentences)
+```{r}
+#| echo: false
+# Table
+top_od_vul <- slice_max(tracts_by_county, tracts_by_county$od_vul_ratio, n=10)
+kable(top_od_vul[, c(1,2,10,11,8, 7)], "simple", 
+      col.names = c("County Name","Total Vulnerable Population", "# of OD in 2024", 
+                    "# of OD to Vulnerable Population Ratio", "% Underserved Tracts", "Geometry"), 
+      caption = "Top 10 priority counties for healthcare investment")
+
+# Create detailed tract-level map
+ggplot(tracts_by_county) +
+  geom_sf(data = pa_counties, fill = "lightgrey", color = "lightgray") +
+  geom_sf(aes(fill = od_vul_ratio), color = "white") +
+  geom_sf(data = combined_ems_buffer, fill = "lightblue", color = "lightblue", alpha = 0.2) +
+  # geom_sf(data = hospitals, color = "red", size = 0.5) +
+  geom_sf(data = ems_stations, color = "red", size = 0.01) +
+  scale_fill_viridis_c(
+    name = "RATIO: # OD's in 2024 to Total \nVulnerable Population",
+    option = "plasma"
+  ) +
+  labs(
+    title = "Ratio of OD's to vulnerable population & EMS service zones",
+    subtitle = "Pennsylvania",
+    caption = "Source: ACS 2022"
+  ) +
+  theme_void()
+```
 
 **Your interpretation:**
 
-[Write your findings here]
-
-
-## Finally - A few comments about your incorporation of feedback!
-Take a few moments to clean up your markdown document and then write a line or two or three about how you may have incorporated feedback that you received after your first assignment. 
-
----
-
-## Submission Requirements
-
-**What to submit:**
-
-1. **Rendered HTML document posted to your course portfolio** with all code, outputs, maps, and text
-   - Use `embed-resources: true` in YAML so it's a single file
-   - All code should run without errors
-   - All maps and charts should display correctly
-2. Submit the correct and working links of your assignment on Canvas
-
----
+It seems that there isn't that clear of a relationship. Further analysis seems to be needed. Many of the top 10 counties with high OD deaths to total population seems to have 0 underserved tracts in the whole county. But maybe this could be exptected given that counties with a bigger opioid crisis might keep the county better prepped. There doesn't seem to be a large correlation with population either. The map seems to show that the majority of OD's seem to be concentrated in counties with large populations, such as Philadelphia. This is also to be expected. Maybe further analyses without the outliers may help.
 
