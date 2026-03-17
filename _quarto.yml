@@ -16,6 +16,12 @@ website:
             text: "Lab 1: Census Data Exploration"
           - href: labs/lab_2/lab2.qmd
             text: "Lab 2: Spatial Analysis and Visualization"
+      - text: Midterm
+        menu:
+          - href: labs/lab_3/technical_appendix.qmd
+            text: "Technical Appendix"
+          - href: labs/lab_3/slides.qmd
+            text: "Pitch Deck"
 
 format:
   html:
