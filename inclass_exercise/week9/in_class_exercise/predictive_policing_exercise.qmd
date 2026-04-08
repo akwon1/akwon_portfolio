@@ -128,7 +128,7 @@ We're using `ESRI:102271` (Illinois State Plane East, NAD83, US Feet). This is a
 #| message: false
 
 # Load from provided data file (downloaded from Chicago open data portal)
-burglaries <- st_read(here("data", "burglaries.shp")) %>% 
+burglaries <- st_read(here("inclass_exercise/week9/data/burglaries.shp")) %>% 
   st_transform('ESRI:102271')
 
 glimpse(burglaries)
@@ -377,7 +377,7 @@ Now we'll create features that might help predict burglaries. We'll use "broken 
 ```{r load-abandoned-cars}
 #| message: false
 
-abandoned_cars <- read_csv(here("data/abandoned_cars_2017.csv"))%>%
+abandoned_cars <- read_csv(here("inclass_exercise/week9/data/abandoned_cars_2017.csv"))%>%
   filter(!is.na(Latitude), !is.na(Longitude)) %>%
   st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326) %>%
   st_transform('ESRI:102271')
