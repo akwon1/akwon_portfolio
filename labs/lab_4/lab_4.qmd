@@ -44,9 +44,7 @@ Browse the available service request types (e.g., Graffiti Removal, Pothole Repa
 
 ### Requirements for Your Choice
 
--   
-
-    ## Choose a **different** violation type than the abandoned cars we did in class.
+-   Choose a **different** violation type than the abandoned cars we did in class.
 
 ## Step 2: Complete the Analysis
 
@@ -61,6 +59,46 @@ Work through all major sections of the analysis:
 -   Load your 311 data and Chicago spatial boundaries
 -   Create visualizations showing the spatial distribution of your violation type
 -   Describe patterns you observe
+
+```{r}
+# Load required packages
+library(tidyverse)      # Data manipulation
+library(sf)             # Spatial operations
+library(here)           # Relative file paths
+library(viridis)        # Color scales
+library(terra)          # Raster operations (replaces 'raster')
+library(spdep)          # Spatial dependence
+library(FNN)            # Fast nearest neighbors
+library(MASS)           # Negative binomial regression
+library(patchwork)      # Plot composition (replaces grid/gridExtra)
+library(knitr)          # Tables
+library(kableExtra)     # Table formatting
+library(classInt)       # Classification intervals
+
+
+# Spatstat for analyzing point patterns - split into sub-packages
+library(spatstat.geom)    # Spatial geometries
+library(spatstat.explore) # Spatial exploration/KDE
+```
+
+```{r}
+graffiti <- st_read("C:/Users/angel/Documents/akwon_portfolio/labs/lab_4/data/311_Service_Requests_-_Graffiti_Removal_-_Historical_20260407.csv") %>%
+  st_transform('ESRI:102271')
+
+# Load Chicago boundary
+chicagoBoundary <- 
+  st_read("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/DATA/Chapter5/chicagoBoundary.geojson") %>%
+  st_transform('ESRI:102271')
+
+ggplot() + 
+  geom_sf(data = chicagoBoundary, fill = "gray95", color = "gray60") +
+  geom_sf(data = graffiti, color = "#d62828", size = 0.1, alpha = 0.4) +
+  labs(
+    title = "Graffiti Locations",
+    subtitle = paste0("Chicago 2017, n = ", nrow(graffiti))
+  )
+```
+
 
 #### Part 2: Fishnet Grid Creation
 
