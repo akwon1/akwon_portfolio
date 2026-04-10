@@ -52,7 +52,8 @@ library(classInt)       # Classification intervals
 library(spatstat.geom)    # Spatial geometries
 library(spatstat.explore) # Spatial exploration/KDE
 
-setwd("/Users/angiekwon/Documents/GitHub/akwon_portfolio/labs/lab_4")
+#setwd("/Users/angiekwon/Documents/GitHub/akwon_portfolio/labs/lab_4")
+setwd("C:/Users/angel/Documents/akwon_portfolio/labs/lab_4")
 
 theme_crime <- function(base_size = 11) {
   theme_minimal(base_size = base_size) +
@@ -107,6 +108,10 @@ lights_locations <- read_csv("data/311_Service_Requests_-_Alley_Lights_Out_-_His
 # Load Chicago boundary
 chicagoBoundary <- 
   st_read("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/DATA/Chapter5/chicagoBoundary.geojson") %>%
+  st_transform('ESRI:102271')
+
+# burglaries
+burglaries <- st_read(here("inclass_exercise/week9/data/burglaries.shp")) %>% 
   st_transform('ESRI:102271')
 
 # Check the data
@@ -180,7 +185,7 @@ cat("  - Cell size:", 500, "x", 500, "meters\n")
 cat("  - Cell area:", round(st_area(fishnet[1,])), "square meters\n")
 ```
 
-```{r aggregate-burglaries}
+```{r aggregate-lights-out}
 # Spatial join: which cell contains each burglary?
 lights_fishnet <- st_join(lights_locations, fishnet, join = st_within) %>%
   st_drop_geometry() %>%
@@ -202,6 +207,31 @@ cat("\nCells with zero burglaries:",
     sum(fishnet$countLights == 0), 
     "/", nrow(fishnet),
     "(", round(100 * sum(fishnet$countLights == 0) / nrow(fishnet), 1), "%)\n")
+```
+
+```{r aggregate-burglaries}
+# Spatial join: which cell contains each burglary?
+burglaries_fishnet <- st_join(burglaries, fishnet, join = st_within) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID) %>%
+  summarize(countBurglaries = n()) 
+
+
+glimpse(burglaries_fishnet)
+st_crs(burglaries_fishnet)
+
+# Join back to fishnet (cells with 0 burglaries will be NA)
+fishnet <- fishnet %>%
+  left_join(burglaries_fishnet, by = "uniqueID") %>%
+  mutate(countBurglaries = replace_na(countBurglaries, 0))
+
+# Summary statistics
+cat("\nBurglary count distribution:\n")
+summary(fishnet$countBurglaries)
+cat("\nCells with zero burglaries:", 
+    sum(fishnet$countBurglaries == 0), 
+    "/", nrow(fishnet),
+    "(", round(100 * sum(fishnet$countBurglaries == 0) / nrow(fishnet), 1), "%)\n")
 ```
 
 ```{r visualize-fishnet}
@@ -356,10 +386,9 @@ fishnet_model <- fishnet %>%
   st_drop_geometry() %>%
   dplyr::select(
     uniqueID,
-    District,
     countBurglaries,
-    abandoned_cars,
-    abandoned_cars.nn,
+    countLights,
+    lights_locations.nn,
     dist_to_hotspot
   ) %>%
   na.omit()  # Remove any remaining NAs
@@ -372,7 +401,7 @@ cat("  - Variables:", ncol(fishnet_model), "\n")
 ```{r fit-poisson}
 # Fit Poisson regression
 model_poisson <- glm(
-  countBurglaries ~ abandoned_cars + abandoned_cars.nn + 
+  countBurglaries ~ countLights + lights_locations.nn + 
     dist_to_hotspot,
   data = fishnet_model,
   family = "poisson"
@@ -386,6 +415,86 @@ summary(model_poisson)
 
 -   Implement Leave-One-Group-Out cross-validation on 2017 data
 -   Calculate and report error metrics (MAE, RMSE)
+
+```{r join-districts}
+# Join district information to fishnet
+fishnet <- st_join(
+  fishnet,
+  policeDistricts,
+  join = st_within,
+  left = TRUE
+) %>%
+  filter(!is.na(District))  # Remove cells outside districts
+
+cat("✓ Joined police districts\n")
+cat("  - Districts:", length(unique(fishnet$District)), "\n")
+cat("  - Cells:", nrow(fishnet), "\n")
+```
+
+```{r spatial-cv}
+# Get unique districts
+districts <- unique(fishnet_model$District)
+cv_results <- tibble()
+
+cat("Running LOGO Cross-Validation...\n")
+
+for (i in seq_along(districts)) {
+  
+  test_district <- districts[i]
+  
+  # Split data
+  train_data <- fishnet_model %>% filter(District != test_district)
+  test_data <- fishnet_model %>% filter(District == test_district)
+  
+  # Fit model on training data
+  model_cv <- glm.nb(
+    countBurglaries ~ abandoned_cars + abandoned_cars.nn + 
+      dist_to_hotspot,
+    data = train_data
+  )
+  
+  # Predict on test data
+  test_data <- test_data %>%
+    mutate(
+      prediction = predict(model_cv, test_data, type = "response")
+    )
+  
+  # Calculate metrics
+  mae <- mean(abs(test_data$countBurglaries - test_data$prediction))
+  rmse <- sqrt(mean((test_data$countBurglaries - test_data$prediction)^2))
+  
+  # Store results
+  cv_results <- bind_rows(
+    cv_results,
+    tibble(
+      fold = i,
+      test_district = test_district,
+      n_test = nrow(test_data),
+      mae = mae,
+      rmse = rmse
+    )
+  )
+  
+  cat("  Fold", i, "/", length(districts), "- District", test_district, 
+      "- MAE:", round(mae, 2), "\n")
+}
+
+# Overall results
+cat("\n✓ Cross-Validation Complete\n")
+cat("Mean MAE:", round(mean(cv_results$mae), 2), "\n")
+cat("Mean RMSE:", round(mean(cv_results$rmse), 2), "\n")
+```
+
+```{r cv-results-table}
+# Show results
+cv_results %>%
+  arrange(desc(mae)) %>%
+  kable(
+    digits = 2,
+    caption = "LOGO CV Results by District"
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
 
 #### Part 6: Model Evaluation
 
