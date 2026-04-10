@@ -37,5 +37,14 @@
   },
   "inclass_exercise/week6/lecture/week6_slides.qmd": {
     "week6_slides.html": "3ffffc55"
+  },
+  "labs/lab_4/lab_4.qmd": {
+    "lab_4.html": "e9f0d9b7"
+  },
+  "inclass_exercise/week9/lecture/First_spatial_lag_prediction_problem.qmd": {
+    "First_spatial_lag_prediction_problem.html": "fc0ee4c8"
+  },
+  "inclass_exercise/week9/lecture/week9_lecture.qmd": {
+    "week9_lecture.html": "6acab865"
   }
 }

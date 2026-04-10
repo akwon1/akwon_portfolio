@@ -5,7 +5,7 @@ author: "Angie Kwon"
 date: today
 format: 
   html:
-    code-fold: false
+    code-fold: true
     toc: true
     toc-location: left
     theme: cosmo
@@ -33,6 +33,8 @@ By completing this assignment, you will demonstrate your ability to:
 ------------------------------------------------------------------------
 
 ```{r}
+#| include: false
+
 # Load required packages
 library(tidyverse)      # Data manipulation
 library(sf)             # Spatial operations
@@ -52,8 +54,8 @@ library(classInt)       # Classification intervals
 library(spatstat.geom)    # Spatial geometries
 library(spatstat.explore) # Spatial exploration/KDE
 
-#setwd("/Users/angiekwon/Documents/GitHub/akwon_portfolio/labs/lab_4")
-setwd("C:/Users/angel/Documents/akwon_portfolio/labs/lab_4")
+setwd("/Users/angiekwon/Documents/GitHub/akwon_portfolio/labs/lab_4")
+#setwd("C:/Users/angel/Documents/akwon_portfolio/labs/lab_4")
 
 theme_crime <- function(base_size = 11) {
   theme_minimal(base_size = base_size) +
@@ -71,27 +73,9 @@ theme_crime <- function(base_size = 11) {
 theme_set(theme_crime())
 ```
 
-## Step 1: Choose Your 311 Violation Type
-
-### Getting the Data
-
-Visit the Chicago 311 Service Requests dataset:
-
-<https://data.cityofchicago.org/stories/s/311-Dataset-Changes-12-11-2018/d7nq-5g7t>
-
-Browse the available service request types (e.g., Graffiti Removal, Pothole Repair, Street Light Out, Sanitation Code Violations, etc.) and **choose one violation type** that interests you.
-
-### Requirements for Your Choice
-
--   Choose a **different** violation type than the abandoned cars we did in class.
-
-## Step 2: Complete the Analysis
+## The Analysis
 
 Using the class exercise as your template, adapt the code to analyze your chosen 311 violation type.
-
-### What to Include
-
-Work through all major sections of the analysis:
 
 #### Part 1: Data Loading & Exploration
 
@@ -99,12 +83,17 @@ Work through all major sections of the analysis:
 -   Create visualizations showing the spatial distribution of your violation type
 -   Describe patterns you observe
 
+I chose alley light outage as a predictor for burglaries in Chicago, because I felt that the broken window effect would be most present in a place where the disarray was most salient, especially during night which is when more crime occurs. Alleys are already untrustworthy as public spaces and broken lights would only add to the feel of unsafety.
+
 ```{r}
+#| include: false
+
 lights_locations <- read_csv("data/311_Service_Requests_-_Alley_Lights_Out_-_Historical_20260408.csv") %>%
+  rename_with(~ gsub(" ", "_", .x)) %>%
   filter(!is.na(Latitude), !is.na(Longitude)) %>%
   st_as_sf(coords = c("Longitude", "Latitude"), crs = 4326) %>%
   st_transform('ESRI:102271')
-
+  
 # Load Chicago boundary
 chicagoBoundary <- 
   st_read("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/DATA/Chapter5/chicagoBoundary.geojson") %>%
@@ -114,12 +103,26 @@ chicagoBoundary <-
 burglaries <- st_read(here("inclass_exercise/week9/data/burglaries.shp")) %>% 
   st_transform('ESRI:102271')
 
+# police districts (used for spatial cross-validation)
+policeDistricts <- 
+  st_read("https://data.cityofchicago.org/api/geospatial/24zt-jpfn?method=export&format=GeoJSON") %>%
+  st_transform('ESRI:102271') %>%
+  dplyr::select(District = dist_num)
+
+# vacant buildings
+vacant <- st_read("data/geo_export_656aaaf5-307a-4116-9ebc-a5d8299babd8.shp") %>%
+  st_transform('ESRI:102271')
+```
+
+```{r}
+#| echo: false
+
 # Check the data
 cat("\n✓ Loaded alley lights-out data\n")
 cat("  - Number of lights out:", nrow(lights_locations), "\n")
 cat("  - CRS:", st_crs(lights_locations)$input, "\n")
-cat("  - Date range:", format(min(lights_locations$Creation.Date, na.rm = TRUE)), "to", 
-    format(max(lights_locations$Creation.Date, na.rm = TRUE)), "\n")
+cat("  - Date range:", format(min(lights_locations$Creation_Date, na.rm = TRUE)), "to", 
+    format(max(lights_locations$Creation_Date, na.rm = TRUE)), "\n")
 
 # plot points
 p1 <- ggplot() + 
@@ -157,6 +160,7 @@ p1 + p2 +
   )
 ```
 
+There seems to be clear hotspots, especially in South Chicago, with a central coldspot on the central East side.
 
 #### Part 2: Fishnet Grid Creation
 
@@ -234,6 +238,81 @@ cat("\nCells with zero burglaries:",
     "(", round(100 * sum(fishnet$countBurglaries == 0) / nrow(fishnet), 1), "%)\n")
 ```
 
+```{r kde-baseline}
+#| message: false
+
+# Convert burglaries to ppp (point pattern) format for spatstat
+burglaries_ppp <- as.ppp(
+  st_coordinates(burglaries),
+  W = as.owin(st_bbox(chicagoBoundary))
+)
+
+# Calculate KDE with 1km bandwidth
+kde_burglaries <- density.ppp(
+  burglaries_ppp,
+  sigma = 1000,  # 1km bandwidth
+  edge = TRUE    # Edge correction
+)
+
+# Convert to terra raster (modern approach, not raster::raster)
+kde_raster <- rast(kde_burglaries)
+
+# Extract KDE values to fishnet cells
+fishnet <- fishnet %>%
+  mutate(
+    kde_value = terra::extract(
+      kde_raster,
+      vect(fishnet),
+      fun = mean,
+      na.rm = TRUE
+    )[, 2]  # Extract just the values column
+  )
+
+cat("✓ Calculated KDE baseline\n")
+```
+
+```{r visualize-kde}
+#| fig-width: 8
+#| fig-height: 6
+
+ggplot() +
+  geom_sf(data = fishnet, aes(fill = kde_value), color = NA) +
+  #geom_sf(data = chicagoBoundary, fill = "blue", color = "white", linewidth = 1) +
+  scale_fill_viridis_c(
+    name = "KDE Value",
+    option = "plasma"
+  ) +
+  labs(
+    title = "Kernel Density Estimation Baseline",
+    subtitle = "Simple spatial smoothing of burglary locations"
+  ) +
+  theme_crime()
+```
+
+```{r aggregate-vacant-buildings}
+vacant_fishnet <- st_join(vacant, fishnet, join = st_within) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID) %>%
+  summarize(countVacant = n()) 
+
+
+glimpse(vacant_fishnet)
+st_crs(vacant_fishnet)
+
+# Join back to fishnet (cells with 0 burglaries will be NA)
+fishnet <- fishnet %>%
+  left_join(vacant_fishnet, by = "uniqueID") %>%
+  mutate(countVacant = replace_na(countVacant, 0))
+
+# Summary statistics
+cat("\nVacant count distribution:\n")
+summary(fishnet$countVacant)
+cat("\nCells with zero vacant buildings:", 
+    sum(fishnet$countVacant == 0), 
+    "/", nrow(fishnet),
+    "(", round(100 * sum(fishnet$countVacant == 0) / nrow(fishnet), 1), "%)\n")
+```
+
 ```{r visualize-fishnet}
 #| fig-width: 8
 #| fig-height: 6
@@ -254,6 +333,8 @@ ggplot() +
   ) +
   theme_crime()
 ```
+
+Creating a fishnet allows us to analyze data where they are spatially in regular cells so that the data isn't weighted by the different sizes people generally use for boundaries on maps. This also allows us to have concrete data for each cells, rather than a general picture like we get in heat maps.
 
 #### Part 3: Spatial Features
 
@@ -285,6 +366,8 @@ fishnet <- fishnet %>%
 cat("✓ Calculated nearest neighbor distances\n")
 summary(fishnet$lights_locations.nn)
 ```
+
+Calculating the 3 nearest broken alley lights from each fishnet cell's center. Then, calculating the mean distance to each of them to gauge how close all 3 are to the center, and therefore how common and close together they are.
 
 ```{r local-morans-lights}
 # Function to calculate Local Moran's I
@@ -350,6 +433,10 @@ ggplot() +
   theme_crime()
 ```
 
+Moran's I calculates hot spots and cold spots where there are a cluster of cells with high outage of alley lights and cluster of cells with low outage of alley lights. This allows us to more concretely determine significant hot spots, cold spots, and outliers.
+
+This map shows clear hot spots scattered in an arc shape from north to south on the western side of Chicago. There are two primary cold spot, one large chunk in the southeast, and a long strip along the eastern side.
+
 ```{r distance-to-hotspots}
 # Get centroids of "High-High" cells (hot spots)
 hotspots <- fishnet %>%
@@ -374,6 +461,23 @@ if (nrow(hotspots) > 0) {
 }
 ```
 
+Calculating each fishnet cell's center's distance to the closest hot spot.
+
+```{r join-districts-&other-contexts}
+# Join district information to fishnet
+fishnet <- st_join(
+  fishnet,
+  policeDistricts,
+  join = st_within,
+  left = TRUE
+) %>%
+  filter(!is.na(District))  # Remove cells outside districts
+
+cat("✓ Joined police districts\n")
+cat("  - Districts:", length(unique(fishnet$District)), "\n")
+cat("  - Cells:", nrow(fishnet), "\n")
+```
+
 #### Part 4: Count Regression Models
 
 -   Fit Poisson regression
@@ -386,8 +490,10 @@ fishnet_model <- fishnet %>%
   st_drop_geometry() %>%
   dplyr::select(
     uniqueID,
+    District,
     countBurglaries,
     countLights,
+    countVacant,
     lights_locations.nn,
     dist_to_hotspot
   ) %>%
@@ -411,25 +517,12 @@ model_poisson <- glm(
 summary(model_poisson)
 ```
 
+Each additional broken light is associated with about a 0.15% increase in expected burglaries. A one-unit increase in nearest-neighbor broken light density is associated with about a 0.62% decrease in burglaries. Each additional meter of distance from a broken light hot spot reduces expected burglaries by about 0.006%. All effects are highly statistically significant with a p value of less than 0.001, indicating strong evidence that these relationships are not due to chance.
+
 #### Part 5: Spatial Cross-Validation (2017)
 
 -   Implement Leave-One-Group-Out cross-validation on 2017 data
 -   Calculate and report error metrics (MAE, RMSE)
-
-```{r join-districts}
-# Join district information to fishnet
-fishnet <- st_join(
-  fishnet,
-  policeDistricts,
-  join = st_within,
-  left = TRUE
-) %>%
-  filter(!is.na(District))  # Remove cells outside districts
-
-cat("✓ Joined police districts\n")
-cat("  - Districts:", length(unique(fishnet$District)), "\n")
-cat("  - Cells:", nrow(fishnet), "\n")
-```
 
 ```{r spatial-cv}
 # Get unique districts
@@ -448,7 +541,7 @@ for (i in seq_along(districts)) {
   
   # Fit model on training data
   model_cv <- glm.nb(
-    countBurglaries ~ abandoned_cars + abandoned_cars.nn + 
+    countBurglaries ~ countLights + lights_locations.nn + 
       dist_to_hotspot,
     data = train_data
   )
@@ -460,8 +553,8 @@ for (i in seq_along(districts)) {
     )
   
   # Calculate metrics
-  mae <- mean(abs(test_data$countBurglaries - test_data$prediction))
-  rmse <- sqrt(mean((test_data$countBurglaries - test_data$prediction)^2))
+  mae <- mean(abs(test_data$countLights - test_data$prediction))
+  rmse <- sqrt(mean((test_data$countLights - test_data$prediction)^2))
   
   # Store results
   cv_results <- bind_rows(
@@ -496,99 +589,86 @@ cv_results %>%
   kable_styling(bootstrap_options = c("striped", "hover"))
 ```
 
+Cross validations are performed to test the model and make sure that they model will hold under new and unforseen samples. After 22 folds, the results show that with a mean MAE of 97.57 and mean RMSE of 117.83, showing that my model's predictions are about 98 lights off the true prediction. The larger RMSE shows that there are some larger errors influencing the model.
+
 #### Part 6: Model Evaluation
 
 -   Compare to KDE baseline
 
-#### CHALLENGE TASK: Temporal Validation (2018) *not mandatory, only if you want very strong spatial analytics muscles*
+```{r final-predictions}
+# Fit final model on all data
+final_model <- glm.nb(
+  countBurglaries ~ countLights + lights_locations.nn + 
+    dist_to_hotspot,
+  data = fishnet_model
+)
 
--   Download 2018 crimes https://data.cityofchicago.org/Public-Safety/Crimes-2018/3i3m-jwuy/about_data
--   Be sure to filter for BURGLARIES (FORCED ENTRY only to match the 2017 data)
--   Aggregate 2018 violations to the same fishnet grid
--   Use your 2017 model to predict 2018 counts
--   Calculate temporal validation metrics
--   Compare spatial vs. temporal validation performance
+# Add predictions back to fishnet
+fishnet <- fishnet %>%
+  mutate(
+    prediction_nb = predict(final_model, fishnet_model, type = "response")[match(uniqueID, fishnet_model$uniqueID)]
+  )
 
-------------------------------------------------------------------------
+# Also add KDE predictions (normalize to same scale as counts)
+kde_sum <- sum(fishnet$kde_value, na.rm = TRUE)
+count_sum <- sum(fishnet$countBurglaries, na.rm = TRUE)
+fishnet <- fishnet %>%
+  mutate(
+    prediction_kde = (kde_value / kde_sum) * count_sum
+  )
+```
 
-## Step 3: Write Your Analysis
+```{r compare-models}
+#| fig-width: 12
+#| fig-height: 4
 
-### Critical Requirement: Explain Each Step
+# Create three maps
+p1 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = countBurglaries), color = NA) +
+  scale_fill_viridis_c(name = "Count", option = "plasma", limits = c(0, 15)) +
+  labs(title = "Actual Burglaries") +
+  theme_crime()
 
-**For each major section, you must explain in your own words:**
+p2 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = prediction_nb), color = NA) +
+  scale_fill_viridis_c(name = "Predicted", option = "plasma", limits = c(0, 15)) +
+  labs(title = "Model Predictions (Neg. Binomial)") +
+  theme_crime()
 
--   **What** you are doing in that step
--   **Why** this step is important for the analysis
--   **What** you found or learned from the results
+p3 <- ggplot() +
+  geom_sf(data = fishnet, aes(fill = prediction_kde), color = NA) +
+  scale_fill_viridis_c(name = "Predicted", option = "plasma", limits = c(0, 15)) +
+  labs(title = "KDE Baseline Predictions") +
+  theme_crime()
 
-Do not simply copy text from the example or from your AI friend. Think about the purpose of each technique and articulate it in your own words.
+p1 + p2 + p3 +
+  plot_annotation(
+    title = "Actual vs. Predicted Burglaries",
+    subtitle = "Does our complex model outperform simple KDE?"
+  )
+```
 
-------------------------------------------------------------------------
+```{r model-comparison-metrics}
+# Calculate performance metrics
+comparison <- fishnet %>%
+  st_drop_geometry() %>%
+  filter(!is.na(prediction_nb), !is.na(prediction_kde)) %>%
+  summarize(
+    model_mae = mean(abs(countBurglaries - prediction_nb)),
+    model_rmse = sqrt(mean((countBurglaries - prediction_nb)^2)),
+    kde_mae = mean(abs(countBurglaries - prediction_kde)),
+    kde_rmse = sqrt(mean((countBurglaries - prediction_kde)^2))
+  )
 
-## Step 4: Format Your Document
+comparison %>%
+  pivot_longer(everything(), names_to = "metric", values_to = "value") %>%
+  separate(metric, into = c("approach", "metric"), sep = "_") %>%
+  pivot_wider(names_from = metric, values_from = value) %>%
+  kable(
+    digits = 2,
+    caption = "Model Performance Comparison"
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
 
-### Formatting Requirements
-
-Your rendered HTML document should be **professional and easy to read**:
-
-#### ✓ Clean Code
-
--   Remove unnecessary code, comments, or debugging lines
--   Keep only essential code chunks
--   Use `code-fold: show` in your YAML header
-
-#### ✓ Clear Structure
-
--   Use headers to organize sections
--   Include a table of contents
--   Add your name and date
-
-#### ✓ Readable Text
-
--   Ensure all text renders properly (no broken markdown)
--   Check that headers appear as headers (not plain text)
--   Use proper markdown formatting
-
-#### ✓ Quality Visualizations
-
--   All plots should have titles and labels
--   Maps should be readable
--   Use consistent color schemes
-
-#### ✓ Professional Presentation
-
--   Proofread for typos
--   Remove any "Your answer here" placeholders
--   Make sure all code runs without errors
--   Make IT NEAT. WE GOTTA LOOK GOOD HERE.
-
-------------------------------------------------------------------------
-
-## Submission Checklist
-
-Before you submit, verify that your document includes:
-
-### Required Components
-
--   [ ] **Introduction**: Brief description of your chosen 311 violation type and why you selected it
--   [ ] **Data Exploration**: Maps and summary statistics of your violation data
--   [ ] **Fishnet Grid**: Successfully created and visualized grid with aggregated counts
--   [ ] **Spatial Features**: At least 2-3 spatial features calculated (k-NN, distance measures, etc.)
--   [ ] **Local Moran's I**: Spatial autocorrelation analysis with interpretation
--   [ ] **Count Regression**: Both Poisson and Negative Binomial models with comparison
--   [ ] **Spatial Cross-Validation**: LOGO CV implemented on 2017 data with reported metrics
--   [ ] **Temporal Validation**: 2018 data aggregated and tested with 2017 model(OPTIONAL.)
--   [ ] **Validation Comparison**: Comparison of spatial vs. temporal validation performance
--   [ ] **Model Comparison**: Your model vs. KDE baseline for 2018 predictions
--   [ ] **Error Analysis**: Maps and discussion of where model performs well/poorly
--   [ ] **Written Explanations**: Your own words explaining each step
-
-### Technical Requirements
-
--   [ ] Document renders to HTML without errors
--   [ ] Code is clean and well-organized
--   [ ] All visualizations display properly
--   [ ] Headers and formatting render correctly
--   [ ] File is named successfully posted to your website
-
-------------------------------------------------------------------------
+Overall, my model has a larger MAE and RMSE, but the difference is not too big, showing that my model is quite close to the baseline KDE prediction.
