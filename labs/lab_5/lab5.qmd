@@ -1,7 +1,7 @@
 ---
 title: "Bikeshare_SpaceTime_Prediction"
 subtitle: "CPLN 5080 - Spring 2026"
-author: "Your Name"
+author: "Angie Kwon"
 date: today
 format:
   html:
@@ -115,7 +115,7 @@ census_api_key(Sys.getenv("CENSUS_API_KEY"))
 
 ```{r load_indego}
 # Read Q1 2025 data
-indego <- read_csv(here("data/indego-trips-2025-q1.csv"))
+indego <- read_csv("data/indego-trips-2025-q1.csv")
 
 # Quick look at the data
 glimpse(indego)
@@ -207,7 +207,7 @@ ggplot(daily_trips, aes(x = date, y = trips)) +
 
 **Question:** What patterns do you see? How does ridership change over time?
 
-Notice a big spike in Februrary of 2025 (the 14th - not just Valentine's Day)? Was anybody in Philly last Feb? What closed everything and cancelled my PPA class? ... Hint: Fly Eagles Fly
+Notice a big spike in February of 2025 (the 14th - not just Valentine's Day)? Was anybody in Philly last Feb? What closed everything and cancelled my PPA class? ... Hint: Fly Eagles Fly
 
 Let's investigate...compare the 14th to all other Friday's in the data...what did you find? Keep this in mind for future Feature Engineering.
 
@@ -1282,8 +1282,7 @@ Write 1-2 paragraphs addressing:
     -   New features you added and why
     -   Critical reflection on deployment
 
-3. **HTML output** with results and visualizations
-
+3.  **HTML output** with results and visualizations
 
 ## Tips for Success
 
