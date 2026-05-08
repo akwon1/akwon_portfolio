@@ -26,6 +26,12 @@ website:
             text: "Technical Appendix"
           - href: labs/lab_3/slides.qmd
             text: "Pitch Deck"
+      - text: Final
+        menu:
+          - href: final/technical_appendix.qmd
+            text: "Predictive Eviction Prevention Technical Appendix"
+          - href: final/slides_MAE.qmd
+            text: "Predictive Eviction Prevention Pitch Deck"
 
 format:
   html:

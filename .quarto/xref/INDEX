@@ -55,5 +55,11 @@
   },
   "labs/lab_5/lab5.qmd": {
     "lab5.html": "9c8b47e9"
+  },
+  "final/technical_appendix.qmd": {
+    "technical_appendix.html": "290a9cc4"
+  },
+  "final/slides_MAE.qmd": {
+    "slides_MAE.html": "6d0a7e1f"
   }
 }
